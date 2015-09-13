@@ -9,7 +9,7 @@ CFLAGS = -g -Wall -ansi
 all: hw
 
 #아래의 매크로들은 컴파일 시 경로지정을 위해 필요
-OBJS = ./src/example.o
+OBJS = ./src/prime_numbers.o
 SRCS = ./src/$(OBJS:.o=.c)
 BIN = ./bin/
 LIB = ./lib

@@ -3,3 +3,6 @@
 
 # Ignore Vim swap files
 **/.*.swp
+
+# Ignore .pyc files
+**/*.pyc

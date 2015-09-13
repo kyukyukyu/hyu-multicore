@@ -1,3 +1,4 @@
+#include <math.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,6 +7,14 @@
 
 /* Type alias for bit sequences. */
 typedef unsigned long seq_t;
+/* Type definition for arguments to be passed to thread function for
+ * sieve_map(). */
+typedef struct {
+  unsigned long i;
+  seq_t* seqs;
+  size_t n_seqs;
+  unsigned long b;
+} maparg_t;
 
 #define SEQ_SIZE (8 * sizeof(seq_t))
 
@@ -27,6 +36,11 @@ size_t alloc_seqs(const unsigned long b, seq_t** seqs);
  * non-prime. In multi-threaded fashion.
  */
 void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs);
+/*
+ * Thread routine which marks multiples of an odd-number which is not marked
+ * as non-prime yet. Arguments to this function is in maparg_t type.
+ */
+void* sieve_map_routine(void* arg);
 /*
  * Filter the result of sieve_map() to count the number of prime numbers
  * between a and b, and if required, fill the array of them. prime_numbers
@@ -109,6 +123,46 @@ size_t alloc_seqs(const unsigned long b, seq_t** seqs) {
 }
 
 void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs) {
+  /* The upper bound for the loop. */
+  unsigned long sqrt_b = (unsigned long) sqrt((double) b);
+  /*
+   * The number to be checked if prime within the first loop. For the second
+   * loop, this is the index of thread to be joined.
+   */
+  unsigned long i;
+  /* Bit mask to use within the loop. Initial value is for number 3. */
+  seq_t mask = 0x1 << 1;
+  /* The index of bit sequence to look at within the loop. */
+  size_t seq_idx = 0;
+  /* The array of IDs of threads generated in this function. */
+  pthread_t* threads;
+  /* The number of threads to be generated. */
+  const size_t n_threads = (sqrt_b - 3 + 1) / 2;
+  /* Allocate spaces for thread IDs. +1 in () is for rounding up. */
+  threads = (pthread_t*) calloc(n_threads, sizeof(pthread_t));
+  for (i = 3; i < sqrt_b; i += 2) {
+    if (!(seqs[seq_idx] & mask)) {
+      /* Not marked as non-prime number yet. */
+      pthread_t* thread = &threads[i - 3];
+      maparg_t* arg;
+      arg = (maparg_t*) malloc(sizeof(maparg_t));
+      arg->i = i;
+      arg->seqs = seqs;
+      arg->n_seqs = n_seqs;
+      arg->b = b;
+      pthread_create(thread, NULL, sieve_map_routine, (void*) arg);
+    }
+  }
+  /* Joins generated threads. */
+  for (i = 0; i < n_threads; ++i) {
+    pthread_join(threads[i], NULL);
+  }
+}
+
+void* sieve_map_routine(void* arg) {
+  /* Arguments is not needed anymore. */
+  free(arg);
+  return NULL;
 }
 
 size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,

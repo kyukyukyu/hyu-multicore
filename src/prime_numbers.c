@@ -23,6 +23,20 @@ size_t find_prime_numbers(const unsigned long a,
  */
 size_t alloc_seqs(const unsigned long b, seq_t** seqs);
 /*
+ * For every odd number smaller than sqrt(b), marks the multiples of the number
+ * non-prime. In multi-threaded fashion.
+ */
+void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs);
+/*
+ * Filter the result of sieve_map() to count the number of prime numbers
+ * between a and b, and if required, fill the array of them. prime_numbers
+ * should be NULL if filling the array is not required. Returns the number of
+ * counted prime numbers.
+ */
+size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
+                    const unsigned long a, const unsigned long b,
+                    unsigned long* const prime_numbers);
+/*
  * Prints the list of prime numbers. The array of prime numbers and the number
  * of them should be provided.
  */
@@ -78,6 +92,10 @@ size_t find_prime_numbers(const unsigned long a,
         (unsigned long*) malloc((b - a) / 2 * sizeof(unsigned long));
   }
   n_seqs = alloc_seqs(b, &seqs);
+  /* Simple, ancient algorithm comes here: Sieve of Eratosthenes. */
+  sieve_map(n_seqs, b, seqs);
+  n_prime = sieve_filter(seqs, n_seqs, a, b,
+                         store_numbers ? *prime_numbers : NULL);
   /* Set them free. */
   free(seqs);
   return n_prime;
@@ -88,6 +106,16 @@ size_t alloc_seqs(const unsigned long b, seq_t** seqs) {
   size_t n_seqs = (b + SEQ_SIZE / 2) / SEQ_SIZE;
   *seqs = (seq_t*) calloc(n_seqs, sizeof(seq_t));
   return n_seqs;
+}
+
+void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs) {
+}
+
+size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
+                    const unsigned long a, const unsigned long b,
+                    unsigned long* const prime_numbers) {
+  size_t n_prime = 0;
+  return n_prime;
 }
 
 void print_prime_numbers(const unsigned long* prime_numbers,

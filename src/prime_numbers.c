@@ -10,9 +10,13 @@ typedef unsigned long seq_t;
 /* Type definition for arguments to be passed to thread function for
  * sieve_map(). */
 typedef struct {
+  /* The number whose multiples will be marked as non-prime. */
   unsigned long i;
+  /* Pointer to the head of bit sequence array. */
   seq_t* seqs;
+  /* Length of array which seqs points to. */
   size_t n_seqs;
+  /* The exclusive upper bound of searching prime numbers. */
   unsigned long b;
 } maparg_t;
 

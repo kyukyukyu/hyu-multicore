@@ -18,7 +18,7 @@ typedef struct {
   size_t n_seqs;
   /* The exclusive upper bound of searching prime numbers. */
   unsigned long b;
-} maparg_t;
+} markarg_t;
 
 #define SEQ_SIZE (8 * sizeof(seq_t))
 
@@ -42,9 +42,9 @@ size_t alloc_seqs(const unsigned long b, seq_t** seqs);
 void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs);
 /*
  * Thread routine which marks multiples of an odd-number which is not marked
- * as non-prime yet. Arguments to this function is in maparg_t type.
+ * as non-prime yet.
  */
-void* sieve_map_routine(void* arg);
+void* sieve_mark_routine(markarg_t* arg);
 /*
  * Filter the result of sieve_map() to count the number of prime numbers
  * between a and b, and if required, fill the array of them. prime_numbers
@@ -147,14 +147,14 @@ void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs) {
   for (i = 3; i < sqrt_b; i += 2) {
     if (!(seqs[seq_idx] & mask)) {
       /* Not marked as non-prime number yet. */
-      pthread_t* thread = &threads[i - 3];
-      maparg_t* arg;
-      arg = (maparg_t*) malloc(sizeof(maparg_t));
+      /* Prepare argument for marking routine. */
+      markarg_t* arg;
+      arg = (markarg_t*) malloc(sizeof(markarg_t));
       arg->i = i;
       arg->seqs = seqs;
       arg->n_seqs = n_seqs;
       arg->b = b;
-      pthread_create(thread, NULL, sieve_map_routine, (void*) arg);
+      pthread_create(thread, NULL, sieve_mark_routine, (void*) arg);
     }
   }
   /* Joins generated threads. */
@@ -163,7 +163,7 @@ void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs) {
   }
 }
 
-void* sieve_map_routine(void* arg) {
+void* sieve_mark_routine(markarg_t* arg) {
   /* Arguments is not needed anymore. */
   free(arg);
   return NULL;

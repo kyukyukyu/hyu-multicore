@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#define SEQ_SIZE (8 * sizeof(seq_t))
+
 /* Type alias for bit sequences. */
 typedef unsigned long seq_t;
 /* Type definition for arguments to be passed to thread function for
@@ -20,7 +22,6 @@ typedef struct {
   unsigned long b;
 } markarg_t;
 
-#define SEQ_SIZE (8 * sizeof(seq_t))
 
 /*
  * Finds prime numbers between a and b, stores them in prime_numbers (only if

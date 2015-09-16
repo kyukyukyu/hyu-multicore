@@ -9,8 +9,7 @@
 
 /* Type alias for bit sequences. */
 typedef unsigned long seq_t;
-/* Type definition for arguments to be passed to thread function for
- * sieve_map(). */
+/* Type definition for arguments to be passed to sieve_mark_routine(). */
 typedef struct {
   /* The number whose multiples will be marked as non-prime. */
   unsigned long i;
@@ -99,15 +98,15 @@ size_t alloc_seqs(const unsigned long b, seq_t** seqs);
  * For every odd number smaller than sqrt(b), marks the multiples of the number
  * non-prime. In multi-threaded fashion. n_threads includes the main thread.
  */
-void sieve_map(const size_t n_seqs, const unsigned long b,
-               const int n_threads, seq_t* const seqs);
+void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
+                     const int n_threads, seq_t* const seqs);
 /*
  * Thread routine which marks multiples of an odd-number which is not marked
  * as non-prime yet.
  */
 void* sieve_mark_routine(markarg_t* arg);
 /*
- * Filter the result of sieve_map() to count the number of prime numbers
+ * Filter the result of sieve_mark_iter() to count the number of prime numbers
  * between a and b, and if required, fill the array of them. prime_numbers
  * should be NULL if filling the array is not required. Returns the number of
  * counted prime numbers.
@@ -331,7 +330,7 @@ size_t find_prime_numbers(const unsigned long a,
   }
   n_seqs = alloc_seqs(b, &seqs);
   /* Simple, ancient algorithm comes here: Sieve of Eratosthenes. */
-  sieve_map(n_seqs, b, n_threads, seqs);
+  sieve_mark_iter(n_seqs, b, n_threads, seqs);
   n_prime = sieve_filter(seqs, n_seqs, a, b,
                          store_numbers ? *prime_numbers : NULL);
   /* Set them free. */
@@ -346,8 +345,8 @@ size_t alloc_seqs(const unsigned long b, seq_t** seqs) {
   return n_seqs;
 }
 
-void sieve_map(const size_t n_seqs, const unsigned long b, const int n_threads,
-               seq_t* const seqs) {
+void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
+                     const int n_threads, seq_t* const seqs) {
   /* The upper bound for the loop. */
   unsigned long sqrt_b = (unsigned long) sqrt((double) b);
   /*

@@ -155,16 +155,49 @@ void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs) {
       arg->seqs = seqs;
       arg->n_seqs = n_seqs;
       arg->b = b;
-      pthread_create(thread, NULL, sieve_mark_routine, (void*) arg);
     }
   }
-  /* Joins generated threads. */
-  for (i = 0; i < n_threads; ++i) {
-    pthread_join(threads[i], NULL);
-  }
+  /* Send a signal that iterating over numbers is over. */
 }
 
 void* sieve_mark_routine(markarg_t* arg) {
+  /* Number whose multiples will be marked. */
+  const unsigned long i = arg->i;
+  /* The number of steps in bit sequences when moving to next multiple. */
+  const int step = (i % (SEQ_SIZE * 2)) / 2;
+  /* The number of jumps in the array of bit sequences when moving to next
+   * multiple. */
+  const int jump = i / (SEQ_SIZE * 2);
+  /* Bit mask to be used for marking. */
+  seq_t mask = 0x1 << step;
+  /* Index of bit sequence to be accessed and used for marking. */
+  size_t seq_idx = jump;
+  /* The length of bit sequence array. */
+  const size_t n_seqs = arg->n_seqs;
+  /* The array of bit sequences to be updated. */
+  seq_t* seqs = arg->seqs;
+  /*
+   * Assume that an integer variable named j is declared. j has the number
+   * which is a multiple of i and j will be marked as non-prime number in this
+   * iteration. The value of j can be computed with mask and seq_idx.
+   * For readability, declaring j is the better choice. But this time,
+   * performance matters...
+   */
+  while (1) {
+    /* Let j be the next multiple of i. i.e. We are doing j += i */
+    seq_idx += jump;
+    if (!(mask << step)) {
+      ++seq_idx;
+    }
+    if (seq_idx >= n_seqs) {
+      /* j got bigger than the biggest number in the array of bit sequences. */
+      break;
+    }
+    /* Circular shift-left */
+    mask = (mask << step) | (mask >> (SEQ_SIZE - step));
+    /* Now j is the next multiple. Mark it non-prime. */
+    seqs[seq_idx] |= mask;
+  }
   /* Arguments is not needed anymore. */
   free(arg);
   return NULL;

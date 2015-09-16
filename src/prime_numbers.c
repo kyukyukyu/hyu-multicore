@@ -444,14 +444,20 @@ void sieve_mark_iter(const size_t n_marks, const unsigned long b,
 }
 
 void* sieve_mark_routine(markarg_t* arg) {
+  /* The index given for this task. */
+  const size_t i = arg->i;
   /* Steps for next multiple. */
-  const size_t step = 2 * arg->i + 1;
+  const size_t step = 2 * i + 1;
   /* The length of mark array. */
   const size_t n_marks = arg->n_marks;
+  /* The first index to be marked. Since for number n = 2k + 1, the first
+   * number to mark is n^2 = (2k + 1)^2 = 4k^2 + 4k + 1 = 2(2k^2 + 2k) + 1.
+   * Here, k is i. */
+  const size_t idx_first = 2 * i * i + 2 * i;
   /* Mark the multiples of the number which maps to arg->marks[arg->i]. */
-  size_t i;
-  for (i = arg->i + step; i < n_marks; i += step) {
-    arg->marks[i] = 1;
+  size_t idx;
+  for (idx = idx_first; idx < n_marks; idx += step) {
+    arg->marks[idx] = 1;
   }
   /* Arguments is not needed anymore. */
   free(arg);

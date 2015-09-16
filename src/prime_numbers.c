@@ -391,30 +391,38 @@ void sieve_mark_iter(const size_t n_marks, const unsigned long b,
   taskqueue_t queue;
   /* The array of IDs of threads generated in this function. */
   pthread_t* threads;
-  /* Allocate spaces for thread IDs. Except for the main thread! */
-  threads = (pthread_t*) calloc(n_threads, sizeof(pthread_t));
-  /* Initialize the task queue. */
-  if (taskqueue_init(&queue, 64 * n_threads) == NULL) {
-    /* Uh oh, it failed. */
-    return;
-  }
-  {
-    /* Create threads to work on the task queue. */
-    int i;
-    for (i = 0; i < n_threads; ++i) {
-      pthread_create(&threads[i], NULL, taskqueue_thread, &queue);
+  /* Flag if multithreaded searching will be used. */
+  int multithreaded = n_threads > 1;
+  if (multithreaded) {
+    /* Allocate spaces for thread IDs. Except for the main thread! */
+    threads = (pthread_t*) calloc(n_threads, sizeof(pthread_t));
+    /* Initialize the task queue. */
+    if (taskqueue_init(&queue, 64 * n_threads) == NULL) {
+      /* Uh oh, it failed. */
+      return;
+    }
+    {
+      /* Create threads to work on the task queue. */
+      int i;
+      for (i = 0; i < n_threads; ++i) {
+        pthread_create(&threads[i], NULL, taskqueue_thread, &queue);
+      }
     }
   }
   for (i = 1; i < idx_sqrt_b; ++i) {
-    if (!(marks[i])) {
-      /* Not marked as non-prime number yet. */
-      /* Prepare argument for marking routine. */
-      markarg_t* arg;
-      arg = (markarg_t*) malloc(sizeof(markarg_t));
-      arg->i = i;
-      arg->marks = marks;
-      arg->n_marks = n_marks;
-      arg->b = b;
+    if (marks[i]) {
+      /* Skip prime numbers. */
+      continue;
+    }
+    /* Not marked as non-prime number yet. */
+    /* Prepare argument for marking routine. */
+    markarg_t* arg;
+    arg = (markarg_t*) malloc(sizeof(markarg_t));
+    arg->i = i;
+    arg->marks = marks;
+    arg->n_marks = n_marks;
+    arg->b = b;
+    if (multithreaded) {
       /* Push a new task to the task queue. */
       while (1) {
         /* Continue the loop only if the task queue is full so that the new
@@ -423,11 +431,16 @@ void sieve_mark_iter(const size_t n_marks, const unsigned long b,
           break;
         }
       }
+    } else {
+      /* Just call the marking routine. */
+      sieve_mark_routine(arg);
     }
   }
-  /* No more task to push to task queue. Gracefully terminate the task queue.
-   * Worker threads will keep working until the queue is exhausted. */
-  taskqueue_terminate(&queue, threads, n_threads);
+  if (multithreaded) {
+    /* No more task to push to task queue. Gracefully terminate the task queue.
+     * Worker threads will keep working until the queue is exhausted. */
+    taskqueue_terminate(&queue, threads, n_threads);
+  }
 }
 
 void* sieve_mark_routine(markarg_t* arg) {

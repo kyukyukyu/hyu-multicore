@@ -334,7 +334,7 @@ void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
    */
   unsigned long i;
   /* Bit mask to use within the loop. Initial value is for number 3. */
-  seq_t mask = 0x1 << 1;
+  seq_t mask = 0x1u << 1;
   /* The index of bit sequence to look at within the loop. */
   size_t seq_idx = 0;
   /* Task queue for marking multiples. */
@@ -376,6 +376,12 @@ void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
         }
       }
     }
+    /* Advance the mask and seq_idx for the next odd number. */
+    mask <<= 1;
+    if (!mask) {
+      mask = 0x1u;
+      ++seq_idx;
+    }
   }
   /* No more task to push to task queue. Gracefully terminate the task queue.
    * Worker threads will keep working until the queue is exhausted. */
@@ -386,14 +392,14 @@ void* sieve_mark_routine(markarg_t* arg) {
   /* Number whose multiples will be marked. */
   const unsigned long i = arg->i;
   /* The number of steps in bit sequences when moving to next multiple. */
-  const int step = (i % (SEQ_SIZE * 2)) / 2;
+  const int step = i % SEQ_SIZE;
   /* The number of jumps in the array of bit sequences when moving to next
    * multiple. */
-  const int jump = i / (SEQ_SIZE * 2);
+  const int jump = i / SEQ_SIZE;
   /* Bit mask to be used for marking. */
-  seq_t mask = 0x1 << step;
+  seq_t mask = 0x1u << ((i % (SEQ_SIZE * 2)) / 2);
   /* Index of bit sequence to be accessed and used for marking. */
-  size_t seq_idx = jump;
+  size_t seq_idx = i / (SEQ_SIZE * 2);
   /* The length of bit sequence array. */
   const size_t n_seqs = arg->n_seqs;
   /* The array of bit sequences to be updated. */
@@ -439,14 +445,21 @@ size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
   /* The number which is being tested. */
   unsigned long i;
   /* The first number for the test. */
-  unsigned long first = a + 1;
+  unsigned long first = (a % 2 == 0) ? a + 1 : a + 2;
   {
     /* Compute the starting point: the smallest number which is bigger than a.
      */
     size_t seq_idx;
-    mask = 0x1 << ((first % (2 * SEQ_SIZE)) / 2);
+    mask = 0x1u << ((first % (2 * SEQ_SIZE)) / 2);
     seq_idx = first / (2 * SEQ_SIZE);
     seq_p = &seqs[seq_idx];
+  }
+  /* The only even prime number 2 was not 'searched'. Let's include this. */
+  if (a == 1) {
+    ++n_prime;
+    if (verbose) {
+      puts("2");
+    }
   }
   i = first;
   while (i < b) {
@@ -461,7 +474,7 @@ size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
     i += 2;
     mask <<= 1;
     if (!mask) {
-      mask = 0x1;
+      mask = 0x1u;
       ++seq_p;
     }
   }

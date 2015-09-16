@@ -14,7 +14,7 @@ SRCS = ./src/$(OBJS:.o=.c)
 BIN = ./bin/
 LIB = ./lib
 INCLUDE = ./include
-LIBNAME = -lpthread
+LIBNAME = -lpthread -lm
 
 #CFLAGS에 -I옵션 추가를 통해 헤더파일 위치 지정
 CFLAGS += -I$(INCLUDE)

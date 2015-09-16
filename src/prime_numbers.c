@@ -80,7 +80,7 @@ int taskqueue_free(taskqueue_t* taskqueue);
  */
 void* taskqueue_thread(void* taskqueue);
 /*
- * Finds prime numbers between a and b with a number of threads (including the
+ * Finds prime numbers between a and b with a number of threads (excluding the
  * main one), and returns the number of found prime numbers. If verbose is
  * nonzero value, found prime numbers will be printed to stdout, one number in
  * one line.
@@ -97,7 +97,8 @@ size_t find_prime_numbers(const unsigned long a,
 size_t alloc_marks(const unsigned long b, mark_t** marks);
 /*
  * For every odd number smaller than sqrt(b), marks the multiples of the number
- * non-prime. In multi-threaded fashion. n_threads includes the main thread.
+ * non-prime. In multi-threaded fashion. n_threads does not include the main
+ * thread.
  */
 void sieve_mark_iter(const size_t n_marks, const unsigned long b,
                      const int n_threads, mark_t* const marks);
@@ -330,19 +331,17 @@ void sieve_mark_iter(const size_t n_marks, const unsigned long b,
   taskqueue_t queue;
   /* The array of IDs of threads generated in this function. */
   pthread_t* threads;
-  /* The number of threads except main one. */
-  const int n_worker_threads = n_threads - 1;
   /* Allocate spaces for thread IDs. Except for the main thread! */
-  threads = (pthread_t*) calloc(n_worker_threads, sizeof(pthread_t));
+  threads = (pthread_t*) calloc(n_threads, sizeof(pthread_t));
   /* Initialize the task queue. */
-  if (taskqueue_init(&queue, 64 * n_worker_threads) == NULL) {
+  if (taskqueue_init(&queue, 64 * n_threads) == NULL) {
     /* Uh oh, it failed. */
     return;
   }
   {
     /* Create threads to work on the task queue. */
     int i;
-    for (i = 0; i < n_worker_threads; ++i) {
+    for (i = 0; i < n_threads; ++i) {
       pthread_create(&threads[i], NULL, taskqueue_thread, &queue);
     }
   }
@@ -368,7 +367,7 @@ void sieve_mark_iter(const size_t n_marks, const unsigned long b,
   }
   /* No more task to push to task queue. Gracefully terminate the task queue.
    * Worker threads will keep working until the queue is exhausted. */
-  taskqueue_terminate(&queue, threads, n_worker_threads);
+  taskqueue_terminate(&queue, threads, n_threads);
 }
 
 void* sieve_mark_routine(markarg_t* arg) {

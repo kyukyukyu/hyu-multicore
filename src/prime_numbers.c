@@ -428,6 +428,42 @@ void* sieve_mark_routine(markarg_t* arg) {
 size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
                     const unsigned long a, const unsigned long b,
                     const int verbose) {
+  /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
+  /* The bit mask used to test if a number associated with a bit in bit
+   * sequence is prime. */
+  seq_t mask;
+  /* Pointer to bit sequence in the array of bit sequences we are looking at.
+   */
+  const seq_t* seq_p;
+  /* The number which is being tested. */
+  unsigned long i;
+  /* The first number for the test. */
+  unsigned long first = a + 1;
+  {
+    /* Compute the starting point: the smallest number which is bigger than a.
+     */
+    size_t seq_idx;
+    mask = 0x1 << ((first % (2 * SEQ_SIZE)) / 2);
+    seq_idx = first / (2 * SEQ_SIZE);
+    seq_p = &seqs[seq_idx];
+  }
+  i = first;
+  while (i < b) {
+    if (!(*seq_p & mask)) {
+      /* i is prime number. */
+      ++n_prime;
+      if (verbose) {
+        printf("%lu\n", i);
+      }
+    }
+    /* Set i to next number and update mask and seq_p. */
+    i += 2;
+    mask <<= 1;
+    if (!mask) {
+      mask = 0x1;
+      ++seq_p;
+    }
+  }
   return n_prime;
 }

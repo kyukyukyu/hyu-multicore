@@ -67,8 +67,9 @@ int taskqueue_push(taskqueue_t* taskqueue, markarg_t* arg);
 int taskqueue_terminate(taskqueue_t* taskqueue, pthread_t* threads,
                         int n_threads);
 /*
- * Frees resources used by task queue. Returns 0 if everything went well,
- * otherwise nonzero value.
+ * Frees resources used by task queue. If taskqueue is dynamically allocated,
+ * it is caller's duty to free it. Returns 0 if everything went well, otherwise
+ * nonzero value.
  */
 int taskqueue_free(taskqueue_t* taskqueue);
 /*
@@ -229,7 +230,6 @@ int taskqueue_free(taskqueue_t* taskqueue) {
     pthread_cond_destroy(&taskqueue->cond);
     pthread_mutex_destroy(&taskqueue->lock);
   }
-  free(taskqueue);
   return 0;
 }
 

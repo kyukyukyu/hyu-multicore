@@ -5,18 +5,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define SEQ_SIZE (8 * sizeof(seq_t))
-
-/* Type alias for bit sequences. */
-typedef unsigned long seq_t;
+/* Type alias for marks. */
+typedef unsigned char mark_t;
 /* Type definition for arguments to be passed to sieve_mark_routine(). */
 typedef struct {
-  /* The number whose multiples will be marked as non-prime. */
-  unsigned long i;
-  /* Pointer to the head of bit sequence array. */
-  seq_t* seqs;
-  /* Length of array which seqs points to. */
-  size_t n_seqs;
+  /* Index of array item which corresponds to the number whose multiples will
+   * be marked as non-prime. */
+  size_t i;
+  /* Pointer to the head of mark array. */
+  mark_t* marks;
+  /* Length of array which marks points to. */
+  size_t n_marks;
   /* The exclusive upper bound of searching prime numbers. */
   unsigned long b;
 } markarg_t;
@@ -91,17 +90,17 @@ size_t find_prime_numbers(const unsigned long a,
                           const int n_threads,
                           const int verbose);
 /*
- * Allocates space for the array of bit sequences which is used for seqs in
+ * Allocates space for the array of marks which is used for seqs in
  * find_prime_numbers(), and returns the length of array. The upper bound of
  * search range and pointer to seqs should be provided.
  */
-size_t alloc_seqs(const unsigned long b, seq_t** seqs);
+size_t alloc_marks(const unsigned long b, mark_t** marks);
 /*
  * For every odd number smaller than sqrt(b), marks the multiples of the number
  * non-prime. In multi-threaded fashion. n_threads includes the main thread.
  */
-void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
-                     const int n_threads, seq_t* const seqs);
+void sieve_mark_iter(const size_t n_marks, const unsigned long b,
+                     const int n_threads, mark_t* const marks);
 /*
  * Thread routine which marks multiples of an odd-number which is not marked
  * as non-prime yet.
@@ -113,7 +112,7 @@ void* sieve_mark_routine(markarg_t* arg);
  * is nonzero value, counted prime numbers are printed to stdout, one number in
  * one line.
  */
-size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
+size_t sieve_filter(const mark_t* marks, const size_t n_marks,
                     const unsigned long a, const unsigned long b,
                     const int verbose);
 
@@ -297,46 +296,36 @@ size_t find_prime_numbers(const unsigned long a,
   /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
   /*
-   * Pointer to the array of bit sequences. Each bit represents if an odd
-   * number is prime or not. A bit with bigger significance represents bigger
-   * number, and the sequence of bigger numbers is stored at bigger index. For
-   * example, if sizeof(seq_t) is 32, seqs[0] is a bit sequence whose LSB
-   * represents whether 1 is prime, and MSB represents whether 63 is prime.
-   * Similarly, LSB of seqs[1] for 65, and MSB of seqs[1] for 127. Each bit is
-   * set 1 if corresponding number is not prime, or 0 otherwise.
+   * Pointer to the array of marks. Each mark represents if an odd number is
+   * prime or not. The first item in this array is for 1, the second for 3,
+   * the third for 5, and so on. Each item has nonzero value if the
+   * corresponding number is nonprime.
    */
-  seq_t* seqs;
-  /* The length of seqs. */
-  size_t n_seqs;
-  n_seqs = alloc_seqs(b, &seqs);
+  mark_t* marks;
+  /* The length of marks. */
+  size_t n_marks;
+  n_marks = alloc_marks(b, &marks);
   /* Simple, ancient algorithm comes here: Sieve of Eratosthenes. */
-  sieve_mark_iter(n_seqs, b, n_threads, seqs);
-  n_prime = sieve_filter(seqs, n_seqs, a, b, verbose);
+  sieve_mark_iter(n_marks, b, n_threads, marks);
+  n_prime = sieve_filter(marks, n_marks, a, b, verbose);
   /* Set them free. */
-  free(seqs);
+  free(marks);
   return n_prime;
 }
 
-size_t alloc_seqs(const unsigned long b, seq_t** seqs) {
-  /* Rounding up b / SEQ_SIZE. */
-  size_t n_seqs = (b + SEQ_SIZE / 2) / SEQ_SIZE;
-  *seqs = (seq_t*) calloc(n_seqs, sizeof(seq_t));
-  return n_seqs;
+size_t alloc_marks(const unsigned long b, mark_t** marks) {
+  size_t n_marks = b / 2;
+  *marks = (mark_t*) calloc(n_marks, sizeof(mark_t));
+  return n_marks;
 }
 
-void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
-                     const int n_threads, seq_t* const seqs) {
+void sieve_mark_iter(const size_t n_marks, const unsigned long b,
+                     const int n_threads, mark_t* const marks) {
   /* The upper bound for the loop. */
   unsigned long sqrt_b = (unsigned long) sqrt((double) b);
-  /*
-   * The number to be checked if prime within the first loop. For the second
-   * loop, this is the index of thread to be joined.
-   */
-  unsigned long i;
-  /* Bit mask to use within the loop. Initial value is for number 3. */
-  seq_t mask = 0x1u << 1;
-  /* The index of bit sequence to look at within the loop. */
-  size_t seq_idx = 0;
+  unsigned long idx_sqrt_b = sqrt_b / 2;
+  /* Temporary loop variable which is used for array index. */
+  size_t i;
   /* Task queue for marking multiples. */
   taskqueue_t queue;
   /* The array of IDs of threads generated in this function. */
@@ -357,15 +346,15 @@ void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
       pthread_create(&threads[i], NULL, taskqueue_thread, &queue);
     }
   }
-  for (i = 3; i < sqrt_b; i += 2) {
-    if (!(seqs[seq_idx] & mask)) {
+  for (i = 1; i < idx_sqrt_b; ++i) {
+    if (!(marks[i])) {
       /* Not marked as non-prime number yet. */
       /* Prepare argument for marking routine. */
       markarg_t* arg;
       arg = (markarg_t*) malloc(sizeof(markarg_t));
       arg->i = i;
-      arg->seqs = seqs;
-      arg->n_seqs = n_seqs;
+      arg->marks = marks;
+      arg->n_marks = n_marks;
       arg->b = b;
       /* Push a new task to the task queue. */
       while (1) {
@@ -376,12 +365,6 @@ void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
         }
       }
     }
-    /* Advance the mask and seq_idx for the next odd number. */
-    mask <<= 1;
-    if (!mask) {
-      mask = 0x1u;
-      ++seq_idx;
-    }
   }
   /* No more task to push to task queue. Gracefully terminate the task queue.
    * Worker threads will keep working until the queue is exhausted. */
@@ -389,71 +372,32 @@ void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
 }
 
 void* sieve_mark_routine(markarg_t* arg) {
-  /* Number whose multiples will be marked. */
-  const unsigned long i = arg->i;
-  /* The number of steps in bit sequences when moving to next multiple. */
-  const int step = i % SEQ_SIZE;
-  /* The number of jumps in the array of bit sequences when moving to next
-   * multiple. */
-  const int jump = i / SEQ_SIZE;
-  /* Bit mask to be used for marking. */
-  seq_t mask = 0x1u << ((i % (SEQ_SIZE * 2)) / 2);
-  /* Index of bit sequence to be accessed and used for marking. */
-  size_t seq_idx = i / (SEQ_SIZE * 2);
-  /* The length of bit sequence array. */
-  const size_t n_seqs = arg->n_seqs;
-  /* The array of bit sequences to be updated. */
-  seq_t* seqs = arg->seqs;
-  /*
-   * Assume that an integer variable named j is declared. j has the number
-   * which is a multiple of i and j will be marked as non-prime number in this
-   * iteration. The value of j can be computed with mask and seq_idx.
-   * For readability, declaring j is the better choice. But this time,
-   * performance matters...
-   */
-  while (1) {
-    /* Let j be the next multiple of i. i.e. We are doing j += i */
-    seq_idx += jump;
-    if (!(mask << step)) {
-      ++seq_idx;
-    }
-    if (seq_idx >= n_seqs) {
-      /* j got bigger than the biggest number in the array of bit sequences. */
-      break;
-    }
-    /* Circular shift-left */
-    mask = (mask << step) | (mask >> (SEQ_SIZE - step));
-    /* Now j is the next multiple. Mark it non-prime. */
-    seqs[seq_idx] |= mask;
+  /* Steps for next multiple. */
+  const size_t step = 2 * arg->i + 1;
+  /* The length of mark array. */
+  const size_t n_marks = arg->n_marks;
+  /* Mark the multiples of the number which maps to arg->marks[arg->i]. */
+  size_t i = arg->i;
+  for (i = arg->i; i < n_marks; i += step) {
+    arg->marks[i] = 1;
+    i += step;
   }
   /* Arguments is not needed anymore. */
   free(arg);
   return NULL;
 }
 
-size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
+size_t sieve_filter(const mark_t* marks, const size_t n_marks,
                     const unsigned long a, const unsigned long b,
                     const int verbose) {
   /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
-  /* The bit mask used to test if a number associated with a bit in bit
-   * sequence is prime. */
-  seq_t mask;
-  /* Pointer to bit sequence in the array of bit sequences we are looking at.
-   */
-  const seq_t* seq_p;
-  /* The number which is being tested. */
-  unsigned long i;
+  /* Array index of the number which is being tested. */
+  unsigned long idx;
   /* The first number for the test. */
-  unsigned long first = (a % 2 == 0) ? a + 1 : a + 2;
-  {
-    /* Compute the starting point: the smallest number which is bigger than a.
-     */
-    size_t seq_idx;
-    mask = 0x1u << ((first % (2 * SEQ_SIZE)) / 2);
-    seq_idx = first / (2 * SEQ_SIZE);
-    seq_p = &seqs[seq_idx];
-  }
+  const unsigned long first = (a % 2 == 0) ? a + 1 : a + 2;
+  /* The first index for the test. */
+  const size_t idx_first = first / 2;
   /* The only even prime number 2 was not 'searched'. Let's include this. */
   if (a == 1) {
     ++n_prime;
@@ -461,21 +405,13 @@ size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
       puts("2");
     }
   }
-  i = first;
-  while (i < b) {
-    if (!(*seq_p & mask)) {
-      /* i is prime number. */
+  for (idx = idx_first; idx < n_marks; ++idx) {
+    if (!marks[idx]) {
+      /* The number which maps to marks[idx] is prime number. */
       ++n_prime;
       if (verbose) {
-        printf("%lu\n", i);
+        printf("%lu\n", 2 * idx + 1);
       }
-    }
-    /* Set i to next number and update mask and seq_p. */
-    i += 2;
-    mask <<= 1;
-    if (!mask) {
-      mask = 0x1u;
-      ++seq_p;
     }
   }
   return n_prime;

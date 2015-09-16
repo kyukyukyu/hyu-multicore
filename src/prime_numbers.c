@@ -81,11 +81,13 @@ int taskqueue_free(taskqueue_t* taskqueue);
  */
 void* taskqueue_thread(void* taskqueue);
 /*
- * Finds prime numbers between a and b, stores them in prime_numbers (only if
- * prime_numbers is not NULL), and returns the number of found prime numbers.
+ * Finds prime numbers between a and b with a number of threads (including the
+ * main one), stores them in prime_numbers (only if prime_numbers is not NULL),
+ * and returns the number of found prime numbers.
  */
 size_t find_prime_numbers(const unsigned long a,
                           const unsigned long b,
+                          const int n_threads,
                           unsigned long** prime_numbers);
 /*
  * Allocates space for the array of bit sequences which is used for seqs in
@@ -95,9 +97,10 @@ size_t find_prime_numbers(const unsigned long a,
 size_t alloc_seqs(const unsigned long b, seq_t** seqs);
 /*
  * For every odd number smaller than sqrt(b), marks the multiples of the number
- * non-prime. In multi-threaded fashion.
+ * non-prime. In multi-threaded fashion. n_threads includes the main thread.
  */
-void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs);
+void sieve_map(const size_t n_seqs, const unsigned long b,
+               const int n_threads, seq_t* const seqs);
 /*
  * Thread routine which marks multiples of an odd-number which is not marked
  * as non-prime yet.
@@ -280,11 +283,13 @@ int main(void) {
   const unsigned long a = 1;
   /* Upper bound for finding prime numbers. */
   const unsigned long b = 1000000000;  /* 10^9 */
+  /* The number of threads to be used. */
+  const int n_threads = 4;
   /* The number of prime numbers in the range. */
   size_t n_prime;
   /* The list of found prime numbers. */
   unsigned long* prime_numbers;
-  n_prime = find_prime_numbers(a, b, &prime_numbers);
+  n_prime = find_prime_numbers(a, b, n_threads, &prime_numbers);
   print_prime_numbers(prime_numbers, n_prime);
   printf("Total number of prime numbers between %lu and %lu is %lu.\n",
          a, b, n_prime);
@@ -295,6 +300,7 @@ int main(void) {
 
 size_t find_prime_numbers(const unsigned long a,
                           const unsigned long b,
+                          const int n_threads,
                           unsigned long** prime_numbers) {
   /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
@@ -325,7 +331,7 @@ size_t find_prime_numbers(const unsigned long a,
   }
   n_seqs = alloc_seqs(b, &seqs);
   /* Simple, ancient algorithm comes here: Sieve of Eratosthenes. */
-  sieve_map(n_seqs, b, seqs);
+  sieve_map(n_seqs, b, n_threads, seqs);
   n_prime = sieve_filter(seqs, n_seqs, a, b,
                          store_numbers ? *prime_numbers : NULL);
   /* Set them free. */
@@ -340,7 +346,8 @@ size_t alloc_seqs(const unsigned long b, seq_t** seqs) {
   return n_seqs;
 }
 
-void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs) {
+void sieve_map(const size_t n_seqs, const unsigned long b, const int n_threads,
+               seq_t* const seqs) {
   /* The upper bound for the loop. */
   unsigned long sqrt_b = (unsigned long) sqrt((double) b);
   /*
@@ -354,8 +361,6 @@ void sieve_map(const size_t n_seqs, const unsigned long b, seq_t* const seqs) {
   size_t seq_idx = 0;
   /* The array of IDs of threads generated in this function. */
   pthread_t* threads;
-  /* The number of threads to be generated. */
-  const size_t n_threads = (sqrt_b - 3 + 1) / 2;
   /* Allocate spaces for thread IDs. +1 in () is for rounding up. */
   threads = (pthread_t*) calloc(n_threads, sizeof(pthread_t));
   for (i = 3; i < sqrt_b; i += 2) {

@@ -81,13 +81,14 @@ int taskqueue_free(taskqueue_t* taskqueue);
 void* taskqueue_thread(void* taskqueue);
 /*
  * Finds prime numbers between a and b with a number of threads (including the
- * main one), stores them in prime_numbers (only if prime_numbers is not NULL),
- * and returns the number of found prime numbers.
+ * main one), and returns the number of found prime numbers. If verbose is
+ * nonzero value, found prime numbers will be printed to stdout, one number in
+ * one line.
  */
 size_t find_prime_numbers(const unsigned long a,
                           const unsigned long b,
                           const int n_threads,
-                          unsigned long** prime_numbers);
+                          const int verbose);
 /*
  * Allocates space for the array of bit sequences which is used for seqs in
  * find_prime_numbers(), and returns the length of array. The upper bound of
@@ -107,19 +108,13 @@ void sieve_mark_iter(const size_t n_seqs, const unsigned long b,
 void* sieve_mark_routine(markarg_t* arg);
 /*
  * Filter the result of sieve_mark_iter() to count the number of prime numbers
- * between a and b, and if required, fill the array of them. prime_numbers
- * should be NULL if filling the array is not required. Returns the number of
- * counted prime numbers.
+ * between a and b, and returns the number of counted prime numbers. If verbose
+ * is nonzero value, counted prime numbers are printed to stdout, one number in
+ * one line.
  */
 size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
                     const unsigned long a, const unsigned long b,
-                    unsigned long* const prime_numbers);
-/*
- * Prints the list of prime numbers. The array of prime numbers and the number
- * of them should be provided.
- */
-void print_prime_numbers(const unsigned long* prime_numbers,
-                         const size_t n_prime);
+                    const int verbose);
 
 taskqueue_t* taskqueue_init(taskqueue_t* taskqueue, int len) {
   /* Initialize. */
@@ -284,29 +279,23 @@ int main(void) {
   const unsigned long b = 1000000000;  /* 10^9 */
   /* The number of threads to be used. */
   const int n_threads = 4;
+  /* Flag for verbose finding. If nonzero, found prime numbers will be printed
+   * to stdout, one number in one line. */
+  const int verbose = 0;
   /* The number of prime numbers in the range. */
   size_t n_prime;
-  /* The list of found prime numbers. */
-  unsigned long* prime_numbers;
-  n_prime = find_prime_numbers(a, b, n_threads, &prime_numbers);
-  print_prime_numbers(prime_numbers, n_prime);
+  n_prime = find_prime_numbers(a, b, n_threads, verbose);
   printf("Total number of prime numbers between %lu and %lu is %lu.\n",
          a, b, n_prime);
-  /* Set them free. */
-  free(prime_numbers);
   return 0;
 }
 
 size_t find_prime_numbers(const unsigned long a,
                           const unsigned long b,
                           const int n_threads,
-                          unsigned long** prime_numbers) {
+                          const int verbose) {
   /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
-  /*
-   * Flag that says if found prime numbers should be stored in prime_numbers.
-   */
-  int store_numbers = !(prime_numbers == NULL);
   /*
    * Pointer to the array of bit sequences. Each bit represents if an odd
    * number is prime or not. A bit with bigger significance represents bigger
@@ -319,20 +308,10 @@ size_t find_prime_numbers(const unsigned long a,
   seq_t* seqs;
   /* The length of seqs. */
   size_t n_seqs;
-  if (store_numbers) {
-    /*
-     * Allocate space for the list of prime numbers. The number of prime
-     * numbers is unknown here. Therefore, allocate space for the half of
-     * numbers between a and b.
-     */
-    *prime_numbers =
-        (unsigned long*) malloc((b - a) / 2 * sizeof(unsigned long));
-  }
   n_seqs = alloc_seqs(b, &seqs);
   /* Simple, ancient algorithm comes here: Sieve of Eratosthenes. */
   sieve_mark_iter(n_seqs, b, n_threads, seqs);
-  n_prime = sieve_filter(seqs, n_seqs, a, b,
-                         store_numbers ? *prime_numbers : NULL);
+  n_prime = sieve_filter(seqs, n_seqs, a, b, verbose);
   /* Set them free. */
   free(seqs);
   return n_prime;
@@ -448,15 +427,7 @@ void* sieve_mark_routine(markarg_t* arg) {
 
 size_t sieve_filter(const seq_t* seqs, const size_t n_seqs,
                     const unsigned long a, const unsigned long b,
-                    unsigned long* const prime_numbers) {
+                    const int verbose) {
   size_t n_prime = 0;
   return n_prime;
-}
-
-void print_prime_numbers(const unsigned long* prime_numbers,
-                         const size_t n_prime) {
-  size_t i;
-  for (i = 0; i < n_prime; ++i) {
-    printf("%lu\n", prime_numbers[i]);
-  }
 }

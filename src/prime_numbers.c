@@ -377,10 +377,9 @@ void* sieve_mark_routine(markarg_t* arg) {
   /* The length of mark array. */
   const size_t n_marks = arg->n_marks;
   /* Mark the multiples of the number which maps to arg->marks[arg->i]. */
-  size_t i = arg->i;
-  for (i = arg->i; i < n_marks; i += step) {
+  size_t i;
+  for (i = arg->i + step; i < n_marks; i += step) {
     arg->marks[i] = 1;
-    i += step;
   }
   /* Arguments is not needed anymore. */
   free(arg);

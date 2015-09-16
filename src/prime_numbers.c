@@ -397,7 +397,7 @@ void sieve_mark_iter(const size_t n_marks, const unsigned long b,
     /* Allocate spaces for thread IDs. Except for the main thread! */
     threads = (pthread_t*) calloc(n_threads, sizeof(pthread_t));
     /* Initialize the task queue. */
-    if (taskqueue_init(&queue, 64 * n_threads) == NULL) {
+    if (taskqueue_init(&queue, 16 * n_threads) == NULL) {
       /* Uh oh, it failed. */
       return;
     }

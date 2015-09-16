@@ -359,10 +359,26 @@ void sieve_map(const size_t n_seqs, const unsigned long b, const int n_threads,
   seq_t mask = 0x1 << 1;
   /* The index of bit sequence to look at within the loop. */
   size_t seq_idx = 0;
+  /* Task queue for marking multiples. */
+  taskqueue_t queue;
   /* The array of IDs of threads generated in this function. */
   pthread_t* threads;
-  /* Allocate spaces for thread IDs. +1 in () is for rounding up. */
-  threads = (pthread_t*) calloc(n_threads, sizeof(pthread_t));
+  /* The number of threads except main one. */
+  const int n_worker_threads = n_threads - 1;
+  /* Allocate spaces for thread IDs. Except for the main thread! */
+  threads = (pthread_t*) calloc(n_worker_threads, sizeof(pthread_t));
+  /* Initialize the task queue. */
+  if (taskqueue_init(&queue, 64 * n_worker_threads) == NULL) {
+    /* Uh oh, it failed. */
+    return;
+  }
+  {
+    /* Create threads to work on the task queue. */
+    int i;
+    for (i = 0; i < n_worker_threads; ++i) {
+      pthread_create(&threads[i], NULL, taskqueue_thread, &queue);
+    }
+  }
   for (i = 3; i < sqrt_b; i += 2) {
     if (!(seqs[seq_idx] & mask)) {
       /* Not marked as non-prime number yet. */
@@ -373,9 +389,19 @@ void sieve_map(const size_t n_seqs, const unsigned long b, const int n_threads,
       arg->seqs = seqs;
       arg->n_seqs = n_seqs;
       arg->b = b;
+      /* Push a new task to the task queue. */
+      while (1) {
+        /* Continue the loop only if the task queue is full so that the new
+         * task can be pushed to the queue. */
+        if (taskqueue_push(&queue, arg) != taskqueue_queue_full) {
+          break;
+        }
+      }
     }
   }
-  /* Send a signal that iterating over numbers is over. */
+  /* No more task to push to task queue. Gracefully terminate the task queue.
+   * Worker threads will keep working until the queue is exhausted. */
+  taskqueue_terminate(&queue, threads, n_worker_threads);
 }
 
 void* sieve_mark_routine(markarg_t* arg) {

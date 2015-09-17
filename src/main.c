@@ -8,10 +8,10 @@ int main(int argc, char* argv[]) {
   /* Flag for verbose finding. If nonzero, found prime numbers will be printed
    * to stdout, one number in one line. */
   static int verbose = 0;
-  /* Lower bound for finding prime numbers. */
+  /* Lower bound for finding prime numbers. Defined with default value. */
   unsigned long a = 1;
   /* Upper bound for finding prime numbers. */
-  unsigned long b;  /* 10^9 */
+  unsigned long b;
   /* The number of threads to be used. */
   int n_threads;
   /* Return value from getopt_long() will be stored here. */

@@ -21,17 +21,15 @@ typedef struct {
 } markarg_t;
 /*
  * Allocates space for the array of marks which is used for seqs in
- * find_prime_numbers(), and returns the length of array. The upper bound of
- * search range and pointer to seqs should be provided.
+ * find_prime_numbers(), and returns the length of array. Pointer to seqs
+ * should be provided.
  */
-size_t alloc_marks(const unsigned long b, mark_t** marks);
+size_t alloc_marks(mark_t** marks);
 /*
  * For every odd number smaller than sqrt(b), marks the multiples of the number
- * non-prime. In multi-threaded fashion. n_threads does not include the main
- * thread.
+ * non-prime. In multi-threaded fashion.
  */
-void sieve_mark_iter(const size_t n_marks, const unsigned long b,
-                     const int n_threads, mark_t* const marks);
+void sieve_mark_iter(const size_t n_marks, mark_t* const marks);
 /*
  * Thread routine which marks multiples of an odd-number which is not marked
  * as non-prime yet.
@@ -43,14 +41,22 @@ void* sieve_mark_routine(void* arg);
  * is nonzero value, counted prime numbers are printed to stdout, one number in
  * one line.
  */
-size_t sieve_filter(const mark_t* marks, const size_t n_marks,
-                    const unsigned long a, const unsigned long b,
-                    const int verbose);
+size_t sieve_filter(const mark_t* marks, const size_t n_marks);
 
-size_t find_prime_numbers(const unsigned long a,
-                          const unsigned long b,
-                          const int n_threads,
-                          const int verbose) {
+/* Flag for verbose finding. If nonzero, found prime numbers will be printed
+ * to stdout, one number in one line. */
+static int verbose;
+/* Lower bound for finding prime numbers. */
+static unsigned long a;
+/* Upper bound for finding prime numbers. */
+static unsigned long b;
+/* The number of threads to be used. */
+static int n_threads;
+
+size_t find_prime_numbers(const unsigned long _a,
+                          const unsigned long _b,
+                          const int _n_threads,
+                          const int _verbose) {
   /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
   /*
@@ -62,23 +68,29 @@ size_t find_prime_numbers(const unsigned long a,
   mark_t* marks;
   /* The length of marks. */
   size_t n_marks;
-  n_marks = alloc_marks(b, &marks);
+  /* Copy configuration to static variables. */
+  a = _a;
+  b = _b;
+  n_threads = _n_threads;
+  verbose = _verbose;
+  /* Allocate spaces for markings. */
+  n_marks = alloc_marks(&marks);
   /* Simple, ancient algorithm comes here: Sieve of Eratosthenes. */
-  sieve_mark_iter(n_marks, b, n_threads, marks);
-  n_prime = sieve_filter(marks, n_marks, a, b, verbose);
+  sieve_mark_iter(n_marks, marks);
+  /* Filter the result to count and print the prime numbers between a and b. */
+  n_prime = sieve_filter(marks, n_marks);
   /* Set them free. */
   free(marks);
   return n_prime;
 }
 
-size_t alloc_marks(const unsigned long b, mark_t** marks) {
+size_t alloc_marks(mark_t** marks) {
   size_t n_marks = b / 2;
   *marks = (mark_t*) calloc(n_marks, sizeof(mark_t));
   return n_marks;
 }
 
-void sieve_mark_iter(const size_t n_marks, const unsigned long b,
-                     const int n_threads, mark_t* const marks) {
+void sieve_mark_iter(const size_t n_marks, mark_t* const marks) {
   /* The upper bound for the loop. */
   unsigned long sqrt_b = (unsigned long) sqrt((double) b);
   unsigned long idx_sqrt_b = sqrt_b / 2;
@@ -162,9 +174,7 @@ void* sieve_mark_routine(void* _arg) {
   return NULL;
 }
 
-size_t sieve_filter(const mark_t* marks, const size_t n_marks,
-                    const unsigned long a, const unsigned long b,
-                    const int verbose) {
+size_t sieve_filter(const mark_t* marks, const size_t n_marks) {
   /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
   /* Array index of the number which is being tested. */

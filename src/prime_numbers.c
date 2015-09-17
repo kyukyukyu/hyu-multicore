@@ -12,12 +12,6 @@ typedef struct {
   /* Index of array item which corresponds to the number whose multiples will
    * be marked as non-prime. */
   size_t i;
-  /* Pointer to the head of mark array. */
-  mark_t* marks;
-  /* Length of array which marks points to. */
-  size_t n_marks;
-  /* The exclusive upper bound of searching prime numbers. */
-  unsigned long b;
 } markarg_t;
 /*
  * Allocates space for the array of marks which is used for seqs in
@@ -29,7 +23,7 @@ size_t alloc_marks(mark_t** marks);
  * For every odd number smaller than sqrt(b), marks the multiples of the number
  * non-prime. In multi-threaded fashion.
  */
-void sieve_mark_iter(const size_t n_marks, mark_t* const marks);
+void sieve_mark_iter();
 /*
  * Thread routine which marks multiples of an odd-number which is not marked
  * as non-prime yet.
@@ -41,7 +35,7 @@ void* sieve_mark_routine(void* arg);
  * is nonzero value, counted prime numbers are printed to stdout, one number in
  * one line.
  */
-size_t sieve_filter(const mark_t* marks, const size_t n_marks);
+size_t sieve_filter();
 
 /* Flag for verbose finding. If nonzero, found prime numbers will be printed
  * to stdout, one number in one line. */
@@ -52,6 +46,15 @@ static unsigned long a;
 static unsigned long b;
 /* The number of threads to be used. */
 static int n_threads;
+/*
+ * Pointer to the array of marks. Each mark represents if an odd number is
+ * prime or not. The first item in this array is for 1, the second for 3,
+ * the third for 5, and so on. Each item has nonzero value if the
+ * corresponding number is nonprime.
+ */
+mark_t* marks;
+/* The length of marks. */
+size_t n_marks;
 
 size_t find_prime_numbers(const unsigned long _a,
                           const unsigned long _b,
@@ -59,15 +62,6 @@ size_t find_prime_numbers(const unsigned long _a,
                           const int _verbose) {
   /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
-  /*
-   * Pointer to the array of marks. Each mark represents if an odd number is
-   * prime or not. The first item in this array is for 1, the second for 3,
-   * the third for 5, and so on. Each item has nonzero value if the
-   * corresponding number is nonprime.
-   */
-  mark_t* marks;
-  /* The length of marks. */
-  size_t n_marks;
   /* Copy configuration to static variables. */
   a = _a;
   b = _b;
@@ -76,9 +70,9 @@ size_t find_prime_numbers(const unsigned long _a,
   /* Allocate spaces for markings. */
   n_marks = alloc_marks(&marks);
   /* Simple, ancient algorithm comes here: Sieve of Eratosthenes. */
-  sieve_mark_iter(n_marks, marks);
+  sieve_mark_iter();
   /* Filter the result to count and print the prime numbers between a and b. */
-  n_prime = sieve_filter(marks, n_marks);
+  n_prime = sieve_filter();
   /* Set them free. */
   free(marks);
   return n_prime;
@@ -90,7 +84,7 @@ size_t alloc_marks(mark_t** marks) {
   return n_marks;
 }
 
-void sieve_mark_iter(const size_t n_marks, mark_t* const marks) {
+void sieve_mark_iter() {
   /* The upper bound for the loop. */
   unsigned long sqrt_b = (unsigned long) sqrt((double) b);
   unsigned long idx_sqrt_b = sqrt_b / 2;
@@ -128,9 +122,6 @@ void sieve_mark_iter(const size_t n_marks, mark_t* const marks) {
     markarg_t* arg;
     arg = (markarg_t*) malloc(sizeof(markarg_t));
     arg->i = i;
-    arg->marks = marks;
-    arg->n_marks = n_marks;
-    arg->b = b;
     if (multithreaded) {
       /* Push a new task to the task queue. */
       while (1) {
@@ -158,8 +149,6 @@ void* sieve_mark_routine(void* _arg) {
   const size_t i = arg->i;
   /* Steps for next multiple. */
   const size_t step = 2 * i + 1;
-  /* The length of mark array. */
-  const size_t n_marks = arg->n_marks;
   /* The first index to be marked. Since for number n = 2k + 1, the first
    * number to mark is n^2 = (2k + 1)^2 = 4k^2 + 4k + 1 = 2(2k^2 + 2k) + 1.
    * Here, k is i. */
@@ -167,14 +156,14 @@ void* sieve_mark_routine(void* _arg) {
   /* Mark the multiples of the number which maps to arg->marks[arg->i]. */
   size_t idx;
   for (idx = idx_first; idx < n_marks; idx += step) {
-    arg->marks[idx] = 1;
+    marks[idx] = 1;
   }
   /* Arguments is not needed anymore. */
   free(arg);
   return NULL;
 }
 
-size_t sieve_filter(const mark_t* marks, const size_t n_marks) {
+size_t sieve_filter() {
   /* The number of prime numbers between a and b. */
   size_t n_prime = 0;
   /* Array index of the number which is being tested. */

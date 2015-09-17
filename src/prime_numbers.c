@@ -1,3 +1,12 @@
+/*
+ * Core for finding prime numbers between two integers using a modified version
+ * of sieve of Eratosthenes, in multithreaded fashion. This checks only odd
+ * numbers since there is no even prime number except 2. Therefore, marks used
+ * in sieve of Eratosthenes is only for odd numbers, and when marking multiples
+ * of a number, say i, which is not marked as nonprime, it sets every i marks.
+ *
+ * Author: Sanggyu Nam <pokeplus@gmail.com>
+ */
 #include "taskqueue.h"
 #include <math.h>
 #include <pthread.h>

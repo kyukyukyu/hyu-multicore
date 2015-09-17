@@ -1,3 +1,9 @@
+/*
+ * A program that finds prime numbers between two integers using a modified
+ * version of sieve of Eratosthenes, in multithreaded fashion.
+ *
+ * Author: Sanggyu Nam <pokeplus@gmail.com>
+ */
 #include "prime_numbers.h"
 #include "taskqueue.h"
 #include <getopt.h>

@@ -1,3 +1,30 @@
+/*
+ * Implementation of task queue for multiple threads.
+ *
+ * To use this, user should allocate a task queue and initialize it by calling
+ * taskqueue_init() with the length of task queue and task routine.
+ *
+ * Initialization of task queue does not include spawning worker threads. User
+ * should create worker threads with taskqueue_thread() as thread routine and
+ * initialized task queue as thread argument. When created, worker threads
+ * waits for any task to be pushed in the queue.
+ *
+ * To enqueue a task, user can call taskqueue_push() with task arguments. As
+ * any task pushed to the queue, worker threads keep grabbing tasks from the
+ * queue and working on the tasks by calling task routine with the argument one
+ * by one, until the queue gets empty.
+ *
+ * It is possible to gracefully terminate task queue so that worker threads
+ * exhaust the queue and terminate.  User can wait worker threads to exhaust
+ * the queue by calling pthread_join() for worker threads.
+ *
+ * This implementation is inspired by a simple implementation of thread pool by
+ * Mathias Brossard <mathias@brossard.org>. It is available at GitHub
+ * (https://github.com/mbrossard/threadpool).
+ *
+ * Author: Sanggyu Nam <pokeplus@gmail.com>
+ * Inspired by: mbrossard/threadpool by Mathias Brossard <mathias@brossard.org>
+ */
 #include <pthread.h>
 
 /* Type definition for (circular) task queue. */

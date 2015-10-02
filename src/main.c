@@ -10,6 +10,9 @@
 
 #include "mvcc.h"
 
+#define ARG_ERROR(msg) \
+    (fprintf(stderr, "Please provide correct argument: %s\n", (msg)))
+
 /* Parses arguments passed to the program, and populates global variable
  * g_program_options with the result. The number of arguments and their values
  * should be given as input. Returns 0 if the parsing was successful.
@@ -40,5 +43,57 @@ int main(int argc, char* argv[]) {
   }
   /* Free memory space allocated in run_mvcc(). */
   free(g_n_updates);
+  return 0;
+}
+
+int parse_args(int argc, char* argv[]) {
+  /* Return value of getopt_long(). */
+  int c;
+  while (1) {
+    static struct option long_options[] = {
+      {"num_thread", required_argument, NULL, 'n'},
+      {"duration", required_argument, NULL, 'd'},
+      {"verify", no_argument, &g_program_options.verify, 'v'},
+      {0, 0, 0, 0}
+    };
+    /* Get next option. */
+    c = getopt_long(argc, argv, "n:d:v", long_options, NULL);
+    if (c == -1) {
+      /* No more option to get. */
+      break;
+    }
+    switch (c) {
+    case 0:
+      /* --verify is set. */
+      break;
+
+    case 'n':
+      /* -n or --num_thread is set. */
+      sscanf(optarg, "%d", &g_program_options.n_threads);
+      break;
+
+    case 'd':
+      /* -d or --duration is set. */
+      sscanf(optarg, "%d", &g_program_options.duration);
+      break;
+
+    case 'v':
+      /* -v is set. */
+      g_program_options.verify = 1;
+      break;
+
+    default:
+      fprintf(stderr, "What?? '%c' ('%d')\n", c, c);
+      return 1;
+    }
+  }
+  if (g_program_options.n_threads <= 0) {
+    ARG_ERROR("\"num_thread\" should be greater than 0");
+    return 1;
+  }
+  if (g_program_options.duration <= 0) {
+    ARG_ERROR("\"duration\" should be greater than 0");
+    return 1;
+  }
   return 0;
 }

@@ -18,11 +18,18 @@
  * should be given as input. Returns 0 if the parsing was successful.
  * Otherwise, corresponding error messeage is printed to stderr, and nonzero
  * value is returned. */
-int parse_args(int argc, char* argv[]);
+static int parse_args(int argc, char* argv[]);
 /* Computes throughput of all threads and fairness based on the value of global
  * variable g_n_updates and prints them to stdout. Returns 0 if the printing
  * was successful. */
-int print_stats();
+static int print_stats();
+
+/* Program options. This is populated in main.c, and should not be modified
+ * in any other files. */
+static program_options_t g_program_options;
+
+/* Pointer to the array of numbers of UPDATE operations for each thread. */
+static int* g_n_updates;
 
 /* Main function of the program. Returns 0 if program has finished without any
  * problem.*/
@@ -32,7 +39,15 @@ int main(int argc, char* argv[]) {
     fputs("Parsing arguments was not successful.\n", stderr);
     return 1;
   }
-  if (run_mvcc()) {
+  /* Allocate memory space for UPDATE operation counts. */
+  g_n_updates = (int*) calloc(g_program_options.n_threads, sizeof(int));
+  if (NULL == g_n_updates) {
+    /* Allocation was not successful. */
+    fputs("Allocation of memory space for UPDATE operation counts was not "
+          "successful.\n", stderr);
+    return 1;
+  }
+  if (run_mvcc(&g_program_options, g_n_updates)) {
     /* Something went wrong while running MVCC. */
     fputs("Something went wrong while running MVCC.\n", stderr);
     return 1;

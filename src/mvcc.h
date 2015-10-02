@@ -49,16 +49,18 @@ typedef struct {
   int verify;
 } program_options_t;
 
-/* Run MVCC according to program options stored in g_program_options.
- * Some memory space is allocated for UPDATE operation counts and g_n_updates
- * is updated to point this space. Returns 0 if running was successful. */
-int run_mvcc(void);
-
-/* Program options. This is populated in main.c, and should not be modified
- * in any other files. */
-program_options_t g_program_options;
-
-/* Pointer to the array of numbers of UPDATE operations for each thread. */
-int* g_n_updates;
+/* Runs MVCC according to program options, and writes UPDATE operation count
+ * in each thread created while running MVCC.
+ *
+ * Pointer to program options object which is const opt and pointer to int data
+ * n_updates should be given as input. n_updates should point to memory space
+ * for a number of int data, and the number should be equal to opt->n_threads.
+ * It is user's responsibility to free this memory space.
+ *
+ * After running MVCC, the memory space pointed by n_updates will be populated
+ * with UPDATE operation count in each thread.
+ *
+ * Returns 0 if running was successful. */
+int run_mvcc(const program_options_t* opt, int* n_updates);
 
 #endif  /* MULTICORE_MVCC_H_ */

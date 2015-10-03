@@ -1,6 +1,7 @@
 #include "mvcc.h"
 
 #include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -44,11 +45,18 @@ static int add_version(const mvcc_data_t a, const mvcc_data_t b,
 /* Thread routine for MVCC. Repeats UPDATE operation forever. Arguments in
  * mvcc_args_t type should be given as input. Returns NULL. */
 static void* mvcc_thread(void* args);
+/* Handler for signal SIGALRM. Sets global flag g_run_main_loop to 0 so that
+ * the loop started after creating threads in the main thread is terminated. */
+static void catch_alarm(int sig);
 
 /* Global version counter variable. */
 static mvcc_vnum_t g_version_counter = 0;
 /* Pointer to memory space for histories of thread. */
 static listnode_t* g_histories;
+/* Flag for the loop in main thread that waits until duration is over while
+ * checking the amount of histories and running garbage collection when
+ * needed. */
+static volatile sig_atomic_t g_run_main_loop = 1;
 
 int run_mvcc(const program_options_t* opt, int* update_counts) {
   /* Loop variable. */
@@ -80,8 +88,16 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
     args->ptr_n_updates = &update_counts[i];
     pthread_create(&threads[i], NULL, mvcc_thread, (void*) args);
   }
-  /* Fall asleep for duration. Created threads will keep running. */
-  sleep(opt->duration);
+  /* Install handler for signal SIGALRM. This signal is raised when duration
+   * is over since alarm() is called. */
+  signal(SIGALRM, catch_alarm);
+  /* Set an alarm that rings after duration. 'Ringing' means sending signal
+   * SIGALRM to this process so that global flag g_run_main_loop is set to
+   * 0. */
+  alarm(opt->duration);
+  /* Waits until the alarm rings while doing something. */
+  while (g_run_main_loop) {
+  }
   /* Cancel threads. */
   for (i = 0; i < opt->n_threads; ++i) {
     if (pthread_cancel(threads[i])) {
@@ -112,4 +128,8 @@ int add_version(const mvcc_data_t a, const mvcc_data_t b,
   version->b = b;
   version->vnum = vnum;
   list_insert((void*) version, node, 0);
+}
+
+void catch_alarm(int sig) {
+  g_run_main_loop = 0;
 }

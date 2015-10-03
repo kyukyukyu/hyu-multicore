@@ -7,6 +7,7 @@
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "mvcc.h"
 
@@ -47,6 +48,8 @@ int main(int argc, char* argv[]) {
           "successful.\n", stderr);
     return 1;
   }
+  /* Initialize random seed. */
+  srand48(time(NULL));
   if (run_mvcc(&g_program_options, g_n_updates)) {
     /* Something went wrong while running MVCC. */
     fputs("Something went wrong while running MVCC.\n", stderr);

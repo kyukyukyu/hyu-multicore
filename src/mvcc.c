@@ -35,6 +35,9 @@ static int add_version(const mvcc_data_t a, const mvcc_data_t b,
  * mvcc_args_t type should be given as input. Returns NULL. */
 static void* mvcc_thread(void* args);
 
+/* Global version counter variable. */
+static mvcc_vnum_t g_version_counter = 0;
+
 int run_mvcc(const program_options_t* opt, int* update_counts) {
   /* Loop variable. */
   int i;
@@ -78,4 +81,8 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
   free(threads);
   free(argslist);
   return 0;
+}
+
+unsigned int get_new_vnum() {
+  return g_version_counter++;
 }

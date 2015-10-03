@@ -57,10 +57,10 @@ typedef struct {
  * for a number of int data, and the number should be equal to opt->n_threads.
  * It is user's responsibility to free this memory space.
  *
- * After running MVCC, the memory space pointed by n_updates will be populated
- * with UPDATE operation count in each thread.
+ * After running MVCC, the memory space pointed by update_counts will be
+ * populated with UPDATE operation count in each thread.
  *
  * Returns 0 if running was successful. */
-int run_mvcc(const program_options_t* opt, int* n_updates);
+int run_mvcc(const program_options_t* opt, int* update_counts);
 
 #endif  /* MULTICORE_MVCC_H_ */

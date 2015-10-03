@@ -35,7 +35,7 @@ static int add_version(const mvcc_data_t a, const mvcc_data_t b,
  * mvcc_args_t type should be given as input. Returns NULL. */
 static void* mvcc_thread(void* args);
 
-int run_mvcc(const program_options_t* opt, int* n_updates) {
+int run_mvcc(const program_options_t* opt, int* update_counts) {
   /* Loop variable. */
   int i;
   /* Pointer to memory space for threads. */
@@ -62,7 +62,7 @@ int run_mvcc(const program_options_t* opt, int* n_updates) {
   for (i = 0; i < opt->n_threads; ++i) {
     mvcc_args_t* args = &argslist[i];
     args->thread_id = i;
-    args->ptr_n_updates = &n_updates[i];
+    args->ptr_n_updates = &update_counts[i];
     pthread_create(&threads[i], NULL, mvcc_thread, (void*) args);
   }
   /* Fall asleep for duration. Created threads will keep running. */

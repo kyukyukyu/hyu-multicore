@@ -12,6 +12,15 @@
 typedef long mvcc_data_t;
 /* Typedef for version numbers. */
 typedef unsigned int mvcc_vnum_t;
+/* Typedef for version entity. */
+typedef struct {
+  /* Data variable A. */
+  mvcc_data_t a;
+  /* Data variable B. */
+  mvcc_data_t b;
+  /* Version number. */
+  mvcc_vnum_t vnum;
+} mvcc_version_t;
 /* Typedef for arguments to thread routine. */
 typedef struct {
   /* Thread ID. */
@@ -26,7 +35,8 @@ static unsigned int get_new_vnum();
 /* Adds a new version of data variables for a thread. The value of two data
  * variables a and b, version number, and thread ID should be given as input.
  * Since only the owner thread can update its history, mutual exclusion is not
- * required for this function.
+ * required for this function. It is caller's responsibility to allocate memory
+ * space for pointer to head node for each of linked lists.
  *
  * Returns nonzero value if an error occured. */
 static int add_version(const mvcc_data_t a, const mvcc_data_t b,
@@ -37,6 +47,8 @@ static void* mvcc_thread(void* args);
 
 /* Global version counter variable. */
 static mvcc_vnum_t g_version_counter = 0;
+/* Pointer to memory space for histories of thread. */
+static listnode_t* g_histories;
 
 int run_mvcc(const program_options_t* opt, int* update_counts) {
   /* Loop variable. */
@@ -85,4 +97,19 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
 
 unsigned int get_new_vnum() {
   return g_version_counter++;
+}
+
+int add_version(const mvcc_data_t a, const mvcc_data_t b,
+                const mvcc_vnum_t vnum, const int thread_id) {
+  /* Pointer to a node of linked list for version history of the thread.
+   * Initialized with the first node. */
+  listnode_t** node = &g_histories[thread_id];
+  /* Pointer to memory space for new version entity to be added. The memory
+   * space will be freed by either garbage collector or teardown routine of
+   * run_mvcc(). */
+  mvcc_version_t* version = (mvcc_version_t*) malloc(sizeof(mvcc_version_t));
+  version->a = a;
+  version->b = b;
+  version->vnum = vnum;
+  list_insert((void*) version, node, 0);
 }

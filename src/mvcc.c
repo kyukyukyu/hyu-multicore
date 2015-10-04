@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "linked_list.h"
+
 #define C 1024
 
 /* Typedef for data variables. */
@@ -52,7 +54,7 @@ static void catch_alarm(int sig);
 /* Global version counter variable. */
 static mvcc_vnum_t g_version_counter = 0;
 /* Pointer to memory space for histories of thread. */
-static listnode_t* g_histories;
+static list_t* g_histories;
 /* Flag for the loop in main thread that waits until duration is over while
  * checking the amount of histories and running garbage collection when
  * needed. */
@@ -77,7 +79,8 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
   /* Create and run threads. */
   threads = (pthread_t*) calloc(opt->n_threads, sizeof(pthread_t));
   argslist = (mvcc_args_t*) calloc(opt->n_threads, sizeof(mvcc_args_t));
-  if (NULL == threads || NULL == argslist) {
+  g_histories = (list_t*) calloc(opt->n_threads, sizeof(list_t));
+  if (NULL == threads || NULL == argslist || NULL == g_histories) {
     fputs("Allocation of memory space for threads was not successful.\n",
           stderr);
     return 1;
@@ -86,6 +89,7 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
     mvcc_args_t* args = &argslist[i];
     args->thread_id = i;
     args->ptr_n_updates = &update_counts[i];
+    list_init(&g_histories[i]);
     pthread_create(&threads[i], NULL, mvcc_thread, (void*) args);
   }
   /* Install handler for signal SIGALRM. This signal is raised when duration
@@ -117,9 +121,8 @@ unsigned int get_new_vnum() {
 
 int add_version(const mvcc_data_t a, const mvcc_data_t b,
                 const mvcc_vnum_t vnum, const int thread_id) {
-  /* Pointer to a node of linked list for version history of the thread.
-   * Initialized with the first node. */
-  listnode_t** node = &g_histories[thread_id];
+  /* Pointer to the linked list for version history of the thread. */
+  list_t* ptr_list = &g_histories[thread_id];
   /* Pointer to memory space for new version entity to be added. The memory
    * space will be freed by either garbage collector or teardown routine of
    * run_mvcc(). */
@@ -127,7 +130,7 @@ int add_version(const mvcc_data_t a, const mvcc_data_t b,
   version->a = a;
   version->b = b;
   version->vnum = vnum;
-  list_insert((void*) version, node, 0);
+  list_insert((void*) version, ptr_list, 0);
 }
 
 void catch_alarm(int sig) {

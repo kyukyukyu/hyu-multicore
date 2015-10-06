@@ -51,6 +51,12 @@ static void* mvcc_thread(void* args);
  * the loop started after creating threads in the main thread is terminated. */
 static void catch_alarm(int sig);
 
+/* Number of threads. Initialized in run_mvcc(). */
+static int g_n_threads;
+/* Whether invariant of variables based on read-view should be verified on each
+ * UPDATE operation. If nonzero, the invariant should be verified. Initialized
+ * in run_mvcc(). */
+static int g_verify;
 /* Global version counter variable. */
 static mvcc_vnum_t g_version_counter = 0;
 /* Pointer to memory space for histories of thread. */
@@ -67,8 +73,11 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
   pthread_t* threads;
   /* Pointer to memory space for the list of arguments to thread routine. */
   mvcc_args_t* argslist;
+  /* Initialize global variables for program options. */
+  g_n_threads = opt->n_threads;
+  g_verify = opt->verify;
   /* Set initial version for each thread. */
-  for (i = 0; i < opt->n_threads; ++i) {
+  for (i = 0; i < g_n_threads; ++i) {
     const mvcc_vnum_t vnum = get_new_vnum();
     const mvcc_data_t a = mrand48();
     const mvcc_data_t b = C - a;
@@ -77,15 +86,15 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
     }
   }
   /* Create and run threads. */
-  threads = (pthread_t*) calloc(opt->n_threads, sizeof(pthread_t));
-  argslist = (mvcc_args_t*) calloc(opt->n_threads, sizeof(mvcc_args_t));
-  g_histories = (list_t*) calloc(opt->n_threads, sizeof(list_t));
+  threads = (pthread_t*) calloc(g_n_threads, sizeof(pthread_t));
+  argslist = (mvcc_args_t*) calloc(g_n_threads, sizeof(mvcc_args_t));
+  g_histories = (list_t*) calloc(g_n_threads, sizeof(list_t));
   if (NULL == threads || NULL == argslist || NULL == g_histories) {
     fputs("Allocation of memory space for threads was not successful.\n",
           stderr);
     return 1;
   }
-  for (i = 0; i < opt->n_threads; ++i) {
+  for (i = 0; i < g_n_threads; ++i) {
     mvcc_args_t* args = &argslist[i];
     args->thread_id = i;
     args->ptr_n_updates = &update_counts[i];
@@ -103,7 +112,7 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
   while (g_run_main_loop) {
   }
   /* Cancel threads. */
-  for (i = 0; i < opt->n_threads; ++i) {
+  for (i = 0; i < g_n_threads; ++i) {
     if (pthread_cancel(threads[i])) {
       fprintf(stderr, "Could not cancel thread %d. (%02lx)\n",
               i, threads[i]);

@@ -7,6 +7,16 @@ void list_init(list_t* ptr_list) {
   ptr_list->head = NULL;
 }
 
+void* list_at(const list_t* ptr_list, unsigned long idx) {
+  /* Pointer to node that will be returned. */
+  list_node_t* node;
+  node = ptr_list->head;
+  while (node && idx--) {
+    node = node->next;
+  }
+  return node;
+}
+
 int list_insert(void* elem, list_t* ptr_list, unsigned long idx) {
   /* Pointer to new node to be inserted into the list. */
   list_node_t* new_node;

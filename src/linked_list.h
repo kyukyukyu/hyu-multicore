@@ -2,6 +2,7 @@
  * Implementation of singly linked list of any type of data referenced by void*
  * type pointer. These operations are defined:
  *
+ * - Reading element at arbitrary position. Takes O(i).
  * - Insertion of new element at arbitrary position i. Takes O(i).
  * - Deletion of the first element in the list that satisfies arbitrary
  *   criteria. Takes O(i), where i is the index of element.
@@ -34,6 +35,10 @@ typedef struct {
 /* Initializer function for a linked list. Pointer to list should be given as
  * input. */
 void list_init(list_t* ptr_list);
+/* Returns the element at arbitrary position. Pointer to list and index of the
+ * position should be given as input. If invalid index is given, NULL pointer
+ * will be returned. */
+void* list_at(const list_t* ptr_list, unsigned long idx);
 /* Inserts a new element at arbitrary position into a linked list. Pointer to
  * new element, pointer to list, and index of position should be given as
  * input. Returns nonzero value if inserting was not successful. */

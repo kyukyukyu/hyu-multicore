@@ -60,7 +60,7 @@ static int g_n_threads;
  * in run_mvcc(). */
 static int g_verify;
 /* Global version counter variable. */
-static mvcc_vnum_t g_version_counter = 0;
+static volatile mvcc_vnum_t g_version_counter = 0;
 /* Pointer to memory space for histories of thread. */
 static list_t* g_histories;
 /* Flag for the loop in main thread that waits until duration is over while

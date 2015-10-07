@@ -14,7 +14,7 @@ void* list_at(const list_t* ptr_list, unsigned long idx) {
   while (node && idx--) {
     node = node->next;
   }
-  return node;
+  return node->elem;
 }
 
 int list_insert(void* elem, list_t* ptr_list, unsigned long idx) {

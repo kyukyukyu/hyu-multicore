@@ -51,7 +51,7 @@ increase_len:
   return 0;
 }
 
-void* list_delete_first(list_t* ptr_list, int(*criteria)(void*)) {
+void* list_delete_first(list_t* ptr_list, crit_closure_t* criteria) {
   /* Pointer to node being worked on. */
   list_node_t* node;
   /* Pointer to node that will be deleted. */
@@ -60,14 +60,14 @@ void* list_delete_first(list_t* ptr_list, int(*criteria)(void*)) {
   void* ret;
   /* Examine the head node. */
   node = ptr_list->head;
-  if (criteria(node->elem)) {
+  if (criteria->func(node->elem, criteria->env)) {
     /* Pointer to head node should be updated. */
     node_del = node;
     ptr_list->head = node_del->next;
     goto node_popped;
   }
   /* Find the node whose next node satisfies the criteria. */
-  while (node->next && !criteria(node->next->elem)) {
+  while (node->next && !criteria->func(node->next->elem, criteria->env)) {
     node = node->next;
   }
   node_del = node->next;
@@ -83,19 +83,19 @@ node_popped:
   return ret;
 }
 
-void list_delete_multiple(list_t* ptr_list, int(*criteria)(void*),
+void list_delete_multiple(list_t* ptr_list, crit_closure_t* criteria,
                           void(*routine)(void*)) {
   /* Pointer to node being worked on. */
   list_node_t* node;
   /* Examine the head node. */
   node = ptr_list->head;
-  if (criteria(node->elem)) {
+  if (criteria->func(node->elem, criteria->env)) {
     /* Pointer to head node should be updated. */
     ptr_list->head = NULL;
     goto list_cut;
   }
   /* Find the node whose next node satisfies the criteria. */
-  while (node->next && !criteria(node->next->elem)) {
+  while (node->next && !criteria->func(node->next->elem, criteria->env)) {
     node = node->next;
   }
   if (NULL == node->next) {

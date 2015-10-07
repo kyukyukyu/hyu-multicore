@@ -31,6 +31,14 @@ typedef struct {
   /* The length of this list. */
   unsigned long length;
 } list_t;
+/* Typedef for criteria closures. */
+typedef struct {
+  /* Function pointer. The first argument is for element, and the second
+   * argument is for environment. */
+  int(*func)(void* elem, void* env);
+  /* Pointer to memory space for bound environment. */
+  void* env;
+} crit_closure_t;
 
 /* Initializer function for a linked list. Pointer to list should be given as
  * input. */
@@ -44,19 +52,19 @@ void* list_at(const list_t* ptr_list, unsigned long idx);
  * input. Returns nonzero value if inserting was not successful. */
 int list_insert(void* elem, list_t* ptr_list, unsigned long idx);
 /* Deletes the first element that satisfies arbitrary criteria from a linked
- * list. Pointer to list, and pointer to criteria function should be given as
- * input. The criteria function should return nonzero value if an element
- * satisfies the criteria. Returns the pointer to deleted element if any,
- * otherwise null pointer. */
-void* list_delete_first(list_t* ptr_list, int(*criteria)(void*));
+ * list. Pointer to list, and pointer to criteria closure should be given as
+ * input. The function in criteria closure should return nonzero value if an
+ * element satisfies the criteria. Returns the pointer to deleted element if
+ * any, otherwise null pointer. */
+void* list_delete_first(list_t* ptr_list, crit_closure_t* criteria);
 /* Deletes multiple elements from the element that satisfies arbitrary criteria
  * to the last element from a linked list, with running arbitrary routine at
- * each deletion of element. Pointer to list, pointer to criteria function, and
+ * each deletion of element. Pointer to list, pointer to criteria closure, and
  * pointer to routine function should be given as input. In contrast to
  * list_delete_first(), this does not return pointers to deleted elements.
  * Instead, caller can do something with these pointers with routine
  * function. */
-void list_delete_multiple(list_t* ptr_list, int(*criteria)(void*),
+void list_delete_multiple(list_t* ptr_list, crit_closure_t* criteria,
                           void(*routine)(void*));
 
 #endif  /* MULTICORE_LINKEDLIST_H_ */

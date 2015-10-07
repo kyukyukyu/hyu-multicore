@@ -120,11 +120,17 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
   /* Initialize global variables for program options. */
   g_n_threads = opt->n_threads;
   g_verify = opt->verify;
+  g_histories = (list_t*) calloc(g_n_threads, sizeof(list_t));
+  if (NULL == g_histories) {
+    fputs("failed to allocate memory space for histories\n", stderr);
+    return 1;
+  }
   /* Set initial version for each thread. */
   for (i = 0; i < g_n_threads; ++i) {
     const mvcc_vnum_t vnum = get_new_vnum();
     const mvcc_data_t a = mrand48();
     const mvcc_data_t b = C - a;
+    list_init(&g_histories[i]);
     if (add_version(a, b, vnum, i)) {
       return 1;
     }
@@ -132,8 +138,7 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
   /* Allocation of memory space for data used in threads. */
   threads = (pthread_t*) calloc(g_n_threads, sizeof(pthread_t));
   argslist = (mvcc_args_t*) calloc(g_n_threads, sizeof(mvcc_args_t));
-  g_histories = (list_t*) calloc(g_n_threads, sizeof(list_t));
-  if (NULL == threads || NULL == argslist || NULL == g_histories) {
+  if (NULL == threads || NULL == argslist) {
     fputs("Allocation of memory space for threads was not successful.\n",
           stderr);
     return 1;
@@ -149,7 +154,6 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
     mvcc_args_t* args = &argslist[i];
     args->thread_id = i;
     args->ptr_n_updates = &update_counts[i];
-    list_init(&g_histories[i]);
     pthread_create(&threads[i], NULL, mvcc_thread, (void*) args);
   }
   /* Install handler for signal SIGALRM. This signal is raised when duration

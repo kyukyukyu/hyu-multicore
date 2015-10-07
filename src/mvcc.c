@@ -10,6 +10,8 @@
 #include "linked_list.h"
 
 #define C 1024
+#define THREAD_ERROR(thread_id, msg) \
+    (fprintf(stderr, "Thread #%d error: %s\n", (thread_id), (msg)))
 
 /* Typedef for data variables. */
 typedef long mvcc_data_t;
@@ -136,10 +138,17 @@ int add_version(const mvcc_data_t a, const mvcc_data_t b,
    * space will be freed by either garbage collector or teardown routine of
    * run_mvcc(). */
   mvcc_version_t* version = (mvcc_version_t*) malloc(sizeof(mvcc_version_t));
+  if (NULL == version) {
+    fprintf(
+        stderr,
+        "failed to add version: a: %ld, b: %ld, vnum: %u, tid: %d\n",
+        a, b, vnum, thread_id);
+    return 1;
+  }
   version->a = a;
   version->b = b;
   version->vnum = vnum;
-  list_insert((void*) version, ptr_list, 0);
+  return list_insert((void*) version, ptr_list, 0);
 }
 
 void catch_alarm(int sig) {

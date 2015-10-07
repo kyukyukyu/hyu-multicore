@@ -115,3 +115,33 @@ int parse_args(int argc, char* argv[]) {
   }
   return 0;
 }
+
+int print_stats() {
+  /* Number of threads. */
+  int n_threads = g_program_options.n_threads;
+  /* Duration in seconds. */
+  int duration = g_program_options.duration;
+  /* Throughput. sum((n_updates / duration) for n_updates in g_n_updates) */
+  double throughput = 0.0;
+  /* Fairness. (s * s) / (n_threads * s2)
+   * where s = sum(n_updates for n_updates in g_n_updates),
+   *       s2 = sum(n_updates * n_updates for n_updates in g_n_updates) */
+  double fairness = 0.0;
+  /* s. */
+  unsigned int s = 0;
+  /* s2. */
+  unsigned int s2 = 0;
+  /* Thread ID. */
+  int tid;
+  for (tid = 0; tid < n_threads; ++tid) {
+    /* Number of updates for thread #tid. */
+    unsigned int n_updates = g_n_updates[tid];
+    s += n_updates;
+    s2 += n_updates * n_updates;
+    throughput += (double) n_updates / (double) duration;
+  }
+  fairness = (double) (s * s) / (double) (n_threads * s2);
+  /* Print throughput and fairness. */
+  return (printf("Throughput: %lf\n", throughput) <= 0 ||
+          printf("Fairness: %lf\n", fairness) <= 0);
+}

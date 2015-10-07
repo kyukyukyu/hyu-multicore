@@ -345,6 +345,45 @@ int take_read_view(mvcc_tvpair_t* read_view) {
   return i;
 }
 
+mvcc_version_t* read_data(
+    mvcc_tvpair_t* read_view,
+    int n_tv_pairs,
+    int tid_j,
+    mvcc_vnum_t vnum) {
+  /* Boundary for version number. Data variables with version number lower than
+   * this number should be read. */
+  mvcc_vnum_t vnum_boundary = vnum;
+  /* Loop variable. */
+  int i;
+  /* Pointer to a node in history for thread Tj. */
+  list_node_t* ptr_node;
+  for (i = 0; i < n_tv_pairs; ++i) {
+    /* Pointer to (tid, vnum) pair at this index. */
+    mvcc_tvpair_t* ptr_tvpair = &read_view[i];
+    if (tid_j == ptr_tvpair->thread_id) {
+      /* Thread Tj is active. */
+      vnum_boundary = ptr_tvpair->vnum;
+      break;
+    }
+  }
+  ptr_node = g_histories[tid_j].head;
+  while (ptr_node) {
+    /* Pointer to version of data variables. */
+    mvcc_version_t* ptr_version = (mvcc_version_t*) ptr_node->elem;
+    if (vnum_boundary > ptr_version->vnum) {
+      /* Found proper version. */
+      return ptr_version;
+    }
+  }
+  /* Uh, oh... */
+  fprintf(
+      stderr,
+      "cannot read data older than version #%u from thread #%d\n",
+      vnum,
+      tid_j);
+  return NULL;
+}
+
 void catch_alarm(int sig) {
   g_run_main_loop = 0;
 }

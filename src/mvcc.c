@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "linked_list.h"
+#include "lock.h"
 
 #define C 1024
 #define THREAD_ERROR(thread_id, msg) \
@@ -33,10 +34,22 @@ typedef struct {
   /* Pointer to memory space where UPDATE operation count will be stored. */
   int* ptr_n_updates;
 } mvcc_args_t;
+/* Typedef for elements of global active thread list. */
+typedef struct {
+  /* Thread ID. */
+  int thread_id;
+  /* Version number of data variables that the thread is working on. */
+  mvcc_vnum_t vnum;
+} mvcc_tvpair_t;
 
 /* Returns a new, unique version number using fetch-and-add counter. It is
  * caller's responsibility to gain the lock for the counter. */
 static mvcc_vnum_t get_new_vnum();
+/* Adds a pair of thread ID and version number to global active thread list.
+ * Returns nonzero value if adding was not successful. */
+static int set_active(int thread_id, mvcc_vnum_t vnum);
+/* Removes a pair with given thread ID from global active thread list. */
+static void set_inactive(int thread_id);
 /* Adds a new version of data variables for a thread. The value of two data
  * variables a and b, version number, and thread ID should be given as input.
  * Since only the owner thread can update its history, mutual exclusion is not
@@ -49,6 +62,23 @@ static int add_version(const mvcc_data_t a, const mvcc_data_t b,
 /* Thread routine for MVCC. Repeats UPDATE operation forever. Arguments in
  * mvcc_args_t type should be given as input. Returns NULL. */
 static void* mvcc_thread(void* args);
+/* Copies global active thread list to read-view. Pointer to memory space for
+ * read-view should be given as input. Returns the number of pairs in read-view
+ * on success, or negative integer on failure. */
+static int take_read_view(mvcc_tvpair_t* read_view);
+/* Reads data variables of arbitrary thread based on read-view. Pointer to
+ * memory space for read-view, number of pairs in the read-view, ID of thread
+ * whose data variable will be read, and version number of data variables in
+ * current thread that will be updated should be given as input. Returns
+ * pointer to memory space for version of data variables.*/
+static mvcc_version_t* read_data(
+    mvcc_tvpair_t* read_view,
+    int n_tv_pairs,
+    int tid_j,
+    mvcc_vnum_t vnum);
+/* Cleanup handler for threads. Frees memory spaces for read-view. Pointer to
+ * the space should be given as input. */
+static void mvcc_thread_cleanup(void* read_view);
 /* Handler for signal SIGALRM. Sets global flag g_run_main_loop to 0 so that
  * the loop started after creating threads in the main thread is terminated. */
 static void catch_alarm(int sig);
@@ -63,6 +93,10 @@ static int g_verify;
 static volatile mvcc_vnum_t g_version_counter = 0;
 /* Pointer to memory space for histories of thread. */
 static list_t* g_histories;
+/* Global active thread list. 'atl' stands for 'Active Thread List'. */
+static list_t g_atl;
+/* Pointer to memory space for lock on global active thread list. */
+static lock_t g_lock_atl;
 /* Flag for the loop in main thread that waits until duration is over while
  * checking the amount of histories and running garbage collection when
  * needed. */
@@ -87,7 +121,7 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
       return 1;
     }
   }
-  /* Create and run threads. */
+  /* Allocation of memory space for data used in threads. */
   threads = (pthread_t*) calloc(g_n_threads, sizeof(pthread_t));
   argslist = (mvcc_args_t*) calloc(g_n_threads, sizeof(mvcc_args_t));
   g_histories = (list_t*) calloc(g_n_threads, sizeof(list_t));
@@ -96,6 +130,13 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
           stderr);
     return 1;
   }
+  /* Initialize global active thread list and a lock for this. */
+  list_init(&g_atl);
+  if (lock_init(&g_lock_atl, g_n_threads)) {
+    fputs("Initialization of lock was not successful.\n", stderr);
+    return 1;
+  }
+  /* Create and run threads. */
   for (i = 0; i < g_n_threads; ++i) {
     mvcc_args_t* args = &argslist[i];
     args->thread_id = i;
@@ -120,6 +161,8 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
               i, threads[i]);
     }
   }
+  /* Destroy lock for global active thread list. */
+  lock_destroy(&g_lock_atl);
   /* Free memory space for threads. */
   free(threads);
   free(argslist);
@@ -149,6 +192,115 @@ int add_version(const mvcc_data_t a, const mvcc_data_t b,
   version->b = b;
   version->vnum = vnum;
   return list_insert((void*) version, ptr_list, 0);
+}
+
+void* mvcc_thread(void* args_void) {
+  /* Pointer to arguments, type-casted. */
+  const mvcc_args_t* args = (mvcc_args_t*) args_void;
+  /* Thread ID. */
+  const int thread_id = args->thread_id;
+  /* Data variables that this thread is working on. */
+  mvcc_data_t a, b;
+  /* Version number of data variables that this thread is working on. */
+  mvcc_vnum_t vnum;
+  /* Pointer to history list for this thread. */
+  list_t* history = &g_histories[thread_id];
+  /* Pointer to latest (which is initial at the first time) version of data
+   * variables for this thread. */
+  mvcc_version_t* latest_ver;
+  /* Read-view. What makes MVCC possible. */
+  mvcc_tvpair_t* read_view;
+  /* The number of pairs in read-view. */
+  int n_rv_pairs;
+
+  /* Load the initial version of data variables. */
+  latest_ver = (mvcc_version_t*) list_at(history, 0);
+  a = latest_ver->a;
+  b = latest_ver->b;
+  vnum = latest_ver->vnum;
+  /* Allocate memory space for read-view. Will be freed in thread cleanup
+   * handler. */
+  read_view = (mvcc_tvpair_t*) calloc(g_n_threads, sizeof(mvcc_tvpair_t));
+  if (NULL == read_view) {
+    /* Allocation was not successful. */
+    THREAD_ERROR(
+        thread_id,
+        "memory space allocation for read-view was not successful");
+    pthread_exit(NULL);
+    return NULL;
+  }
+  /* Push cleanup handler for this thread. */
+  pthread_cleanup_push(mvcc_thread_cleanup, (void*) read_view);
+
+  /* To infinity, and beyond! */
+  while (1) {
+    /* ID of random-picked thread Tj. This should be other than ID of this
+     * thread. */
+    int tid_j;
+    /* Version of data variables of thread Tj which is determined based on
+     * read-view. */
+    mvcc_version_t* data_j;
+    /* Atomic guard starts ================================================= */
+    lock_on(&g_lock_atl, thread_id);
+    vnum = get_new_vnum();
+    if (set_active(thread_id, vnum)) {
+      /* This should not happen, but setting this thread active was not
+       * successful. */
+      THREAD_ERROR(thread_id, "setting thread active was not successful");
+      goto terminate_thread;
+    }
+    /* Memory barrier is required here since setting this thread active must
+     * be done before taking read-view. */
+    __sync_synchronize();
+    n_rv_pairs = take_read_view(read_view);
+    if (n_rv_pairs <= 0) {
+      /* The number of pairs in read-view cannot be <= 0 since this thread is
+       * set active. Something was wrong on taking read-view. */
+      THREAD_ERROR(thread_id, "taking read-view was not successful");
+      goto terminate_thread;
+    }
+    lock_off(&g_lock_atl, thread_id);
+    /* Atomic guard ends =================================================== */
+
+    /* UPDATE operation starts ============================================= */
+    /* Random-pick thread ID other than mine. */
+    tid_j = (thread_id + 1 + mrand48() % (g_n_threads - 1)) % g_n_threads;
+    /* Read data variables of proper version based on read-view. */
+    data_j = read_data(read_view, n_rv_pairs, tid_j, vnum);
+    if (NULL == data_j) {
+      /* Invalid data variables. */
+      THREAD_ERROR(
+          thread_id,
+          "read invalid data variables from another thread.");
+      goto terminate_thread;
+    }
+    a += data_j->a;
+    b -= data_j->a;
+    if (g_verify && verify_invariant(read_view, n_rv_pairs, vnum)) {
+      /* --verify is on and constant invariant is violated. */
+      THREAD_ERROR(thread_id, "constant invariant violation");
+      goto terminate_thread;
+    }
+    add_version(a, b, vnum, thread_id);
+    /* UPDATE operation ends =============================================== */
+
+    /* Atomic guard starts ================================================= */
+    lock_on(&g_lock_atl, thread_id);
+    set_inactive(thread_id);
+    lock_off(&g_lock_atl, thread_id);
+    /* Atomic guard ends =================================================== */
+
+    /* Increment UPDATE operation count for this thread. */
+    ++(*args->ptr_n_updates);
+  }
+terminate_thread:
+  pthread_cleanup_pop(1);
+  pthread_exit(NULL);
+  return NULL;
+}
+
+void mvcc_thread_cleanup(void* read_view) {
+  free(read_view);
 }
 
 void catch_alarm(int sig) {

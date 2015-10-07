@@ -330,6 +330,21 @@ void set_inactive(int thread_id) {
   free(ptr_tvpair);
 }
 
+int take_read_view(mvcc_tvpair_t* read_view) {
+  /* Pointer to a node in global active thread list. */
+  list_node_t* ptr_node;
+  /* Index in read-view. */
+  int i;
+  ptr_node = g_atl.head;
+  i = 0;
+  while (ptr_node) {
+    read_view[i] = *((mvcc_tvpair_t*) ptr_node->elem);
+    ptr_node = ptr_node->next;
+    ++i;
+  }
+  return i;
+}
+
 void catch_alarm(int sig) {
   g_run_main_loop = 0;
 }

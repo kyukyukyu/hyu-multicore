@@ -36,7 +36,7 @@ typedef struct {
 
 /* Returns a new, unique version number using fetch-and-add counter. It is
  * caller's responsibility to gain the lock for the counter. */
-static unsigned int get_new_vnum();
+static mvcc_vnum_t get_new_vnum();
 /* Adds a new version of data variables for a thread. The value of two data
  * variables a and b, version number, and thread ID should be given as input.
  * Since only the owner thread can update its history, mutual exclusion is not
@@ -126,7 +126,7 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
   return 0;
 }
 
-unsigned int get_new_vnum() {
+mvcc_vnum_t get_new_vnum() {
   return g_version_counter++;
 }
 

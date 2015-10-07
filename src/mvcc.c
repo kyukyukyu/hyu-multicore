@@ -128,7 +128,7 @@ int run_mvcc(const program_options_t* opt, int* update_counts) {
   /* Set initial version for each thread. */
   for (i = 0; i < g_n_threads; ++i) {
     const mvcc_vnum_t vnum = get_new_vnum();
-    const mvcc_data_t a = mrand48();
+    const mvcc_data_t a = rand() % 1024;
     const mvcc_data_t b = C - a;
     list_init(&g_histories[i]);
     if (add_version(a, b, vnum, i)) {
@@ -275,8 +275,9 @@ void* mvcc_thread(void* args_void) {
     /* Atomic guard ends =================================================== */
 
     /* UPDATE operation starts ============================================= */
-    /* Random-pick thread ID other than mine. */
-    tid_j = (thread_id + 1 + mrand48() % (g_n_threads - 1)) % g_n_threads;
+    /* Random-pick thread ID other than mine. Actually, rand() is not
+     * thread-safe. But... that's not important for now. */
+    tid_j = (thread_id + 1 + rand() % (g_n_threads - 1)) % g_n_threads;
     /* Read data variables of proper version based on read-view. */
     data_j = read_data(read_view, n_rv_pairs, tid_j, vnum);
     if (NULL == data_j) {

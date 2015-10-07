@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   /* Initialize random seed. */
-  srand48(time(NULL));
+  srand(time(NULL));
   if (run_mvcc(&g_program_options, g_n_updates)) {
     /* Something went wrong while running MVCC. */
     fputs("Something went wrong while running MVCC.\n", stderr);

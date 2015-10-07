@@ -76,6 +76,14 @@ static mvcc_version_t* read_data(
     int n_tv_pairs,
     int tid_j,
     mvcc_vnum_t vnum);
+/* Verifies constant invariant of data variables based on read-view. Pointer to
+ * memory space for read-view, number of pairs in the read-view, and version
+ * number of data variables in current thread that will be updated should be
+ * given as input. Returns nonzero value if constant invariant is violated. */
+static int verify_invariant(
+    mvcc_tvpair_t* read_view,
+    int n_tv_pairs,
+    mvcc_vnum_t vnum);
 /* Cleanup handler for threads. Frees memory spaces for read-view. Pointer to
  * the space should be given as input. */
 static void mvcc_thread_cleanup(void* read_view);
@@ -382,6 +390,34 @@ mvcc_version_t* read_data(
       vnum,
       tid_j);
   return NULL;
+}
+
+int verify_invariant(
+    mvcc_tvpair_t* read_view,
+    int n_tv_pairs,
+    mvcc_vnum_t vnum) {
+  /* Thread ID. */
+  int tid;
+  for (tid = 0; tid < g_n_threads; ++tid) {
+    /* Pointer to version of data variables from thread #tid. */
+    mvcc_version_t* ptr_version;
+    ptr_version = read_data(read_view, n_tv_pairs, tid, vnum);
+    if (NULL == ptr_version) {
+      return 1;
+    }
+    if (C != ptr_version->a + ptr_version->b) {
+      /* Constant invariant violated. */
+      fprintf(
+          stderr,
+          "constant invariant violated - tid: %d, vnum: %u, a: %ld, b: %ld\n",
+          tid,
+          ptr_version->vnum,
+          ptr_version->a,
+          ptr_version->b);
+      return 1;
+    }
+  }
+  return 0;
 }
 
 void catch_alarm(int sig) {

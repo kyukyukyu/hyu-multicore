@@ -303,6 +303,33 @@ void mvcc_thread_cleanup(void* read_view) {
   free(read_view);
 }
 
+int set_active(int thread_id, mvcc_vnum_t vnum) {
+  /* Pointer to memory space for pair of thread ID and version number. This
+   * will be freed in set_inactive(). */
+  mvcc_tvpair_t* ptr_tvpair = (mvcc_tvpair_t*) malloc(sizeof(mvcc_tvpair_t));
+  if (NULL == ptr_tvpair) {
+    THREAD_ERROR(thread_id, "failed to create (thread_id, vnum) pair");
+    return 1;
+  }
+  ptr_tvpair->thread_id = thread_id;
+  ptr_tvpair->vnum = vnum;
+  return list_insert(ptr_tvpair, &g_atl, 0);
+}
+
+int crit_set_inactive(void* ptr_tvpair, void* ptr_thread_id) {
+  return ((mvcc_tvpair_t*) ptr_tvpair)->thread_id == *((int*) ptr_thread_id);
+}
+
+void set_inactive(int thread_id) {
+  /* Criteria closure for deleting a (tid, vnum) pair from global active thread
+   * list. */
+  crit_closure_t criteria = {crit_set_inactive, &thread_id};
+  /* Pointer to memory space for (tid, vnum) pair which is removed from global
+   * active thread list. */
+  mvcc_tvpair_t* ptr_tvpair = list_delete_first(&g_atl, &criteria);
+  free(ptr_tvpair);
+}
+
 void catch_alarm(int sig) {
   g_run_main_loop = 0;
 }

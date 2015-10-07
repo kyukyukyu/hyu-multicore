@@ -136,6 +136,7 @@ int print_stats() {
   for (tid = 0; tid < n_threads; ++tid) {
     /* Number of updates for thread #tid. */
     unsigned int n_updates = g_n_updates[tid];
+    printf("Thread #%d: %u\n", tid, n_updates);
     s += n_updates;
     s2 += n_updates * n_updates;
     throughput += (double) n_updates / (double) duration;

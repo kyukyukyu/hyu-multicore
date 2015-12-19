@@ -20,6 +20,16 @@ enum errcode_t {
   ERR_PRINT_STATS
 };
 
+// Record type.
+struct record_t {
+  // Record ID. The first record has ID 1.
+  unsigned long id;
+  // Value for this record.
+  long value;
+  // ID of the last transaction who has updated the value of this record.
+  unsigned long last_updated_trx_id;
+};
+
 // The number of records in single table.
 extern int g_table_size;
 // The number of threads to be created.
@@ -36,6 +46,10 @@ extern unsigned long g_n_update;
 extern unsigned long g_n_aborted;
 // Global counter for transaction ID. The first transaction has ID 1.
 extern unsigned long g_counter_trx;
+// Table A.
+extern record_t* g_table_a;
+// Table B.
+extern record_t* g_table_b;
 
 } // namespace multicore
 

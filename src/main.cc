@@ -1,4 +1,6 @@
 #include <cstdio>
+#include <cstdlib>
+#include <ctime>
 
 extern "C" {
 #include <getopt.h>
@@ -19,6 +21,8 @@ int g_table_size;
 int g_num_thread;
 int g_read_num;
 int g_duration;
+record_t* g_table_a;
+record_t* g_table_b;
 // Array of POSIX threads.
 pthread_t* g_threads;
 // Number of READ operations during the test.
@@ -38,14 +42,18 @@ int create_tables(void);
 void* thread_body(void*);
 // Prints stats for the test.
 int print_stats(void);
+// Frees memory for two tables.
+inline void free_tables(void);
 
 int main(int argc, char* argv[]) {
   int retval = 0;
+  // Set random seed.
+  std::srand(std::time(NULL));
   if (retval = parse_args(argc, argv)) {
     return retval;
   }
-  if (create_tables()) {
-    return static_cast<int>(ERR_CREATE_TABLES);
+  if (retval = create_tables()) {
+    return retval;
   }
   g_threads = new pthread_t[g_num_thread];
   for (int i = 0; i < g_num_thread; ++i) {
@@ -65,6 +73,7 @@ int main(int argc, char* argv[]) {
     return retval;
   }
   delete g_threads;
+  free_tables();
   return 0;
 }
 
@@ -130,6 +139,22 @@ int parse_args(int argc, char* argv[]) {
   return 0;
 }
 
+int create_tables(void) {
+  g_table_a = new record_t[g_table_size];
+  g_table_b = new record_t[g_table_size];
+  for (int i = 0; i < g_table_size; ++i) {
+    auto& record_a = g_table_a[i];
+    auto& record_b = g_table_b[i];
+    record_a.id = i + 1;
+    record_a.value = (std::rand() % (100000 - 10000)) + 10000;
+    record_a.last_updated_trx_id = 0;
+    record_b.id = i + 1;
+    record_b.value = (std::rand() % (100000 - 10000)) + 10000;
+    record_b.last_updated_trx_id = 0;
+  }
+  return 0;
+}
+
 int print_stats(void) {
   if (0 > std::printf("READ throughput: %lu READS and %lf READS/sec\n",
         g_n_read, COMPUTE_RATE(g_n_read, g_duration)) ||
@@ -142,6 +167,11 @@ int print_stats(void) {
     return ERRCODE_TO_INT(ERR_PRINT_STATS);
   }
   return 0;
+}
+
+void free_tables(void) {
+  delete g_table_a;
+  delete g_table_b;
 }
 
 } // namespace multicore

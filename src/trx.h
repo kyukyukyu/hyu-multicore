@@ -5,11 +5,17 @@ extern "C" {
 #include <pthread.h>
 }
 
+#define ERRCODE_TO_INT(x) (static_cast<int>((x)))
+
 namespace multicore {
 
 // Enum for error codes.
 enum errcode_t {
-  ERR_ARGUMENTS = 1,
+  ERR_UNKNOWN_OPTION = 1,
+  ERR_INVALID_TABLE_SIZE,
+  ERR_INVALID_NUM_THREAD,
+  ERR_INVALID_READ_NUM,
+  ERR_INVALID_DURATION,
   ERR_CREATE_TABLES,
   ERR_PRINT_STATS
 };

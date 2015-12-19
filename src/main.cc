@@ -8,6 +8,9 @@ extern "C" {
 
 #include "trx.h"
 
+#define ARG_ERROR(msg) \
+    (std::fprintf(stderr, "Invalid argument: %s\n", (msg)))
+
 namespace multicore {
 
 int g_table_size;
@@ -35,8 +38,9 @@ void* thread_body(void*);
 int print_stats(void);
 
 int main(int argc, char* argv[]) {
-  if (parse_args(argc, argv)) {
-    return static_cast<int>(ERR_ARGUMENTS);
+  int retval;
+  if (retval = parse_args(argc, argv)) {
+    return retval;
   }
   if (create_tables()) {
     return static_cast<int>(ERR_CREATE_TABLES);
@@ -59,6 +63,68 @@ int main(int argc, char* argv[]) {
     return static_cast<int>(ERR_PRINT_STATS);
   }
   delete g_threads;
+  return 0;
+}
+
+int parse_args(int argc, char* argv[]) {
+  // Return value of getopt_long().
+  int c;
+  while (1) {
+    static struct option long_options[] = {
+      {"table_size", optional_argument, NULL, 't'},
+      {"num_thread", optional_argument, NULL, 'n'},
+      {"read_num", optional_argument, NULL, 'r'},
+      {"duration", optional_argument, NULL, 'd'},
+      {0, 0, 0, 0}
+    };
+    // Get next option.
+    c = getopt_long(argc, argv, "t::n::r::d::", long_options, NULL);
+    if (c == -1) {
+      // No more options to get.
+      break;
+    }
+    switch (c) {
+    case 't':
+      // -t or --table_size
+      std::sscanf(optarg, "%d", &g_table_size);
+      break;
+
+    case 'n':
+      // -n or --num_thread
+      std::sscanf(optarg, "%d", &g_num_thread);
+      break;
+
+    case 'r':
+      // -r or --read_num
+      std::sscanf(optarg, "%d", &g_read_num);
+      break;
+
+    case 'd':
+      // -d or --duration
+      std::sscanf(optarg, "%d", &g_duration);
+      break;
+
+    default:
+      std::fprintf(stderr, "What?? '%c' ('%d')\n", c, c);
+      return ERRCODE_TO_INT(ERR_UNKNOWN_OPTION);
+    }
+  }
+  if (0 >= g_table_size) {
+    ARG_ERROR("table_size should be greater than 0");
+    return ERRCODE_TO_INT(ERR_INVALID_TABLE_SIZE);
+  }
+  if (0 >= g_num_thread) {
+    ARG_ERROR("num_thread should be greater than 0");
+    return ERRCODE_TO_INT(ERR_INVALID_NUM_THREAD);
+  }
+  if (0 > g_read_num || 10 < g_read_num) {
+    ARG_ERROR("read_num should be in [0, 10]");
+    return ERRCODE_TO_INT(ERR_INVALID_READ_NUM);
+  }
+  if (0 >= g_duration) {
+    ARG_ERROR("duration should be greater than 0");
+    return ERRCODE_TO_INT(ERR_INVALID_DURATION);
+  }
   return 0;
 }
 

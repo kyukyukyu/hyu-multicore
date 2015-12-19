@@ -10,6 +10,8 @@ extern "C" {
 
 #define ARG_ERROR(msg) \
     (std::fprintf(stderr, "Invalid argument: %s\n", (msg)))
+#define COMPUTE_RATE(count, duration) \
+    (static_cast<double>(count) / static_cast<double>(duration))
 
 namespace multicore {
 
@@ -38,7 +40,7 @@ void* thread_body(void*);
 int print_stats(void);
 
 int main(int argc, char* argv[]) {
-  int retval;
+  int retval = 0;
   if (retval = parse_args(argc, argv)) {
     return retval;
   }
@@ -59,8 +61,8 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < g_num_thread; ++i) {
     pthread_join(g_threads[i], NULL);
   }
-  if (print_stats()) {
-    return static_cast<int>(ERR_PRINT_STATS);
+  if (retval = print_stats()) {
+    return retval;
   }
   delete g_threads;
   return 0;
@@ -124,6 +126,20 @@ int parse_args(int argc, char* argv[]) {
   if (0 >= g_duration) {
     ARG_ERROR("duration should be greater than 0");
     return ERRCODE_TO_INT(ERR_INVALID_DURATION);
+  }
+  return 0;
+}
+
+int print_stats(void) {
+  if (0 > std::printf("READ throughput: %lu READS and %lf READS/sec\n",
+        g_n_read, COMPUTE_RATE(g_n_read, g_duration)) ||
+      0 > std::printf("UPDATE throughput: %lu UPDATES and %lf UPDATES/sec\n",
+        g_n_update, COMPUTE_RATE(g_n_update, g_duration)) ||
+      0 > std::printf("Transaction throughput: %lu trx and %lf trx/sec\n",
+        g_counter_trx - 1, COMPUTE_RATE(g_counter_trx - 1, g_duration)) ||
+      0 > std::printf("Aborted transactions: %lu aborts and %lf aborts/sec\n",
+        g_n_aborted, COMPUTE_RATE(g_n_aborted, g_duration))) {
+    return ERRCODE_TO_INT(ERR_PRINT_STATS);
   }
   return 0;
 }

@@ -60,6 +60,9 @@ int main(int argc, char* argv[]) {
   if (retval = create_tables()) {
     return retval;
   }
+  if (retval = lockmgr_create()) {
+    return retval;
+  }
   g_threads = new pthread_t[g_num_thread];
   targs = new int[g_num_thread];
   for (int i = 0; i < g_num_thread; ++i) {
@@ -82,6 +85,7 @@ int main(int argc, char* argv[]) {
   delete g_threads;
   delete targs;
   free_tables();
+  lockmgr_free();
   return 0;
 }
 

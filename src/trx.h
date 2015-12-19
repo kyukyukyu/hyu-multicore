@@ -96,6 +96,10 @@ extern record_t* g_table_b;
 // Creates a transaction object with given thread index, and runs a transaction
 // for this.
 int run_transaction(int thread_idx, trx_t** p_trx);
+// Creates lock manager.
+int lockmgr_create(void);
+// Frees lock manager.
+void lockmgr_free(void);
 // Frees a transaction object. This releases locks the transaction is holding.
 void trx_free(trx_t* trx);
 

@@ -37,7 +37,7 @@ unsigned long g_counter_trx = 0;
 // Parses arguments passed to process into program options.
 int parse_args(int argc, char* argv[]);
 // Creates two tables which have g_table_size records each.
-int create_tables(void);
+int table_create(void);
 // Thread routine which runs transactions endlessly.
 void* thread_body(void* t_idx);
 // Cleanup routine for a thread that frees the transaction object on which the
@@ -46,7 +46,7 @@ void thread_cleanup(void* trx);
 // Prints stats for the test.
 int print_stats(void);
 // Frees memory for two tables.
-inline void free_tables(void);
+inline void table_free(void);
 
 int main(int argc, char* argv[]) {
   int retval = 0;
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
   if (retval = parse_args(argc, argv)) {
     return retval;
   }
-  if (retval = create_tables()) {
+  if (retval = table_create()) {
     return retval;
   }
   if (retval = lockmgr_create()) {
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
   }
   delete g_threads;
   delete targs;
-  free_tables();
+  table_free();
   lockmgr_free();
   return 0;
 }
@@ -151,7 +151,7 @@ int parse_args(int argc, char* argv[]) {
   return 0;
 }
 
-int create_tables(void) {
+int table_create(void) {
   g_table_a = new record_t[g_table_size];
   g_table_b = new record_t[g_table_size];
   for (int i = 0; i < g_table_size; ++i) {
@@ -208,7 +208,7 @@ int print_stats(void) {
   return 0;
 }
 
-void free_tables(void) {
+void table_free(void) {
   delete g_table_a;
   delete g_table_b;
 }

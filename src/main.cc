@@ -39,7 +39,10 @@ int parse_args(int argc, char* argv[]);
 // Creates two tables which have g_table_size records each.
 int create_tables(void);
 // Thread routine which runs transactions endlessly.
-void* thread_body(void*);
+void* thread_body(void* t_idx);
+// Cleanup routine for a thread that frees the transaction object on which the
+// thread was working.
+void thread_cleanup(void* trx);
 // Prints stats for the test.
 int print_stats(void);
 // Frees memory for two tables.
@@ -47,6 +50,8 @@ inline void free_tables(void);
 
 int main(int argc, char* argv[]) {
   int retval = 0;
+  // Thread arguments.
+  int* targs;
   // Set random seed.
   std::srand(std::time(NULL));
   if (retval = parse_args(argc, argv)) {
@@ -56,8 +61,10 @@ int main(int argc, char* argv[]) {
     return retval;
   }
   g_threads = new pthread_t[g_num_thread];
+  targs = new int[g_num_thread];
   for (int i = 0; i < g_num_thread; ++i) {
-    pthread_create(&g_threads[i], NULL, thread_body, NULL);
+    pthread_create(&g_threads[i], NULL, thread_body,
+        static_cast<void*>(&targs[i]));
   }
   // Zzz...
   sleep(g_duration);
@@ -73,6 +80,7 @@ int main(int argc, char* argv[]) {
     return retval;
   }
   delete g_threads;
+  delete targs;
   free_tables();
   return 0;
 }
@@ -153,6 +161,33 @@ int create_tables(void) {
     record_b.last_updated_trx_id = 0;
   }
   return 0;
+}
+
+void* thread_body(void* t_idx) {
+  // Pointer to transaction object.
+  trx_t* trx = nullptr;
+  // Register cleanup routine for this thread. Cleanup routine should free
+  // transaction object on which this thread is working.
+  pthread_cleanup_push(thread_cleanup, static_cast<void*>(trx));
+  // Run endless test.
+  while (1) {
+    if (run_transaction(*static_cast<int*>(t_idx), &trx)) {
+      // Something went wrong on running transaction. This does not mean that
+      // the transaction is aborted.
+      pthread_exit(NULL);
+    }
+  }
+  pthread_cleanup_pop(0);
+  return NULL;
+}
+
+void thread_cleanup(void* trx) {
+  // Type-casted trx.
+  auto _trx = static_cast<trx_t*>(trx);
+  if (nullptr != _trx) {
+    trx_free(_trx);
+    delete _trx;
+  }
 }
 
 int print_stats(void) {

@@ -1,6 +1,8 @@
 #ifndef MULTICORE_TRX_H_
 #define MULTICORE_TRX_H_
 
+#include <vector>
+
 extern "C" {
 #include <pthread.h>
 }
@@ -8,6 +10,11 @@ extern "C" {
 #define ERRCODE_TO_INT(x) (static_cast<int>((x)))
 
 namespace multicore {
+
+// Type for transaction object.
+struct trx_t;
+// Type for lock object.
+struct lock_t;
 
 // Enum for error codes.
 enum errcode_t {
@@ -28,6 +35,41 @@ struct record_t {
   long value;
   // ID of the last transaction who has updated the value of this record.
   unsigned long last_updated_trx_id;
+};
+struct trx_t {
+  // ID for this transaction.
+  unsigned long trx_id;
+  // Index of thread this transaction is running on.
+  int thread_idx;
+  // List of lock objects this transaction is holding.
+  std::vector<lock_t*> trx_locks;
+  // State of this transaction.
+  enum state_t {
+    RUNNING, WAITING, IDLE
+  } trx_state;
+  // Mutex for sleeping/waking-up this transaction.
+  pthread_mutex_t trx_mutex;
+  // Condition variable for sleeping/waking-up this transaction.
+  pthread_cond_t trx_cond;
+  // Lock object this transaction is waiting for. nullptr if this transaction
+  // is waiting for no one.
+  lock_t* wait_lock;
+};
+struct lock_t {
+  // Table ID. 0 for A and 1 for B.
+  unsigned long table_id;
+  // Record ID.
+  unsigned long record_id;
+  // Lock mode.
+  enum mode_t {
+    SHARED, EXCLUSIVE
+  } mode;
+  // Lock state.
+  enum state_t {
+    WAITING, ACQUIRED, LOGICALLY_RELEASED
+  } state;
+  // Pointer to holder transaction.
+  trx_t* trx;
 };
 
 // The number of records in single table.
@@ -50,6 +92,12 @@ extern unsigned long g_counter_trx;
 extern record_t* g_table_a;
 // Table B.
 extern record_t* g_table_b;
+
+// Creates a transaction object with given thread index, and runs a transaction
+// for this.
+int run_transaction(int thread_idx, trx_t** p_trx);
+// Frees a transaction object. This releases locks the transaction is holding.
+void trx_free(trx_t* trx);
 
 } // namespace multicore
 

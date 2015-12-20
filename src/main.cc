@@ -101,6 +101,11 @@ int main(int argc, char* argv[]) {
 int parse_args(int argc, char* argv[]) {
   // Return value of getopt_long().
   int c;
+  // Set default values for program options.
+  g_table_size = 10000;
+  g_num_thread = sysconf(_SC_NPROCESSORS_ONLN);
+  g_read_num = 10;
+  g_duration = 30;
   while (1) {
     static struct option long_options[] = {
       {"table_size", optional_argument, NULL, 't'},

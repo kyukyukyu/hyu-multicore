@@ -74,6 +74,7 @@ int main(int argc, char* argv[]) {
   g_threads = new pthread_t[g_num_thread];
   targs = new int[g_num_thread];
   for (int i = 0; i < g_num_thread; ++i) {
+    targs[i] = i;
     pthread_create(&g_threads[i], NULL, thread_body,
         static_cast<void*>(&targs[i]));
   }

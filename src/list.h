@@ -45,14 +45,15 @@ template <typename T> int list_append(T value, list_t<T>* list) {
   node->value = value;
   node->next = nullptr;
   // Run test-and-set for tail of list with new node.
-  node->prev = __sync_lock_test_and_set(&list->tail, node);
+  node->prev = list->tail;
+  list->tail = node;
   if (nullptr == node->prev) {
     list->head = node;
   } else {
     // Update next pointer of previous node.
     node->prev->next = node;
   }
-  __sync_add_and_fetch(&list->n_nodes, 1);
+  list->n_nodes += 1;
   return 0;
 }
 
@@ -74,7 +75,7 @@ template <typename T> int list_remove(listnode_t<T>* node, list_t<T>* list) {
     list->tail = node->prev;
   }
   delete node;
-  __sync_add_and_fetch(&list->n_nodes, -1);
+  list->n_nodes -= 1;
   return 0;
 }
 

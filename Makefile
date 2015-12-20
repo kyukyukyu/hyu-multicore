@@ -9,7 +9,7 @@ CXXFLAGS = -g -Wall -std=c++11
 all: hw
 
 #아래의 매크로들은 컴파일 시 경로지정을 위해 필요
-OBJS = ./src/main.o
+OBJS = ./src/main.o ./src/trx.o
 SRCS = ./src/$(OBJS:.o=.cc)
 BIN = ./bin/
 LIB = ./lib

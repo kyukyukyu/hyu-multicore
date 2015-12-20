@@ -122,6 +122,13 @@ int trx_commit(trx_t* trx);
 int trx_abort(trx_t* trx);
 // Frees a transaction object. This releases locks the transaction is holding.
 void trx_free(trx_t* trx);
+// Runs READ operation for given table ID and record ID on given transaction.
+// Returns nonzero value if deadlock is detected.
+int db_read(unsigned long table_id, unsigned long record_id, trx_t* trx,
+    long* p_val);
+// Runs UPDATE operation for given record ID on given transaction. Returns
+// nonzero value if deadlock is detected.
+int db_update(unsigned long record_id, trx_t* trx);
 
 } // namespace multicore
 

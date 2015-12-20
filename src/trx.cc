@@ -2,6 +2,8 @@
 
 #include "trx.h"
 
+#define RECORD(table_id, record_id) (g_table[(table_id)][(record_id) - 1])
+
 namespace multicore {
 
 lockmgr_t g_lockmgr;
@@ -98,6 +100,37 @@ void trx_free(trx_t* trx) {
   }
   pthread_mutex_destroy(&trx->trx_mutex);
   pthread_cond_destroy(&trx->trx_cond);
+}
+
+int db_read(unsigned long table_id, unsigned long record_id, trx_t* trx,
+    long* p_val) {
+  if (lockmgr_acquire(table_id, record_id, trx, lock_t::SHARED)) {
+    // Deadlock detected!!
+    return 1;
+  }
+  *p_val = RECORD(table_id, record_id).value;
+  return 0;
+}
+
+int db_update(unsigned long record_id, trx_t* trx) {
+  if (lockmgr_acquire(0, record_id, trx, lock_t::EXCLUSIVE) ||
+      lockmgr_acquire(1, record_id, trx, lock_t::EXCLUSIVE)) {
+    // Deadlock detected!!
+    return 1;
+  }
+  auto* record_a = &RECORD(0, record_id);
+  auto* record_b = &RECORD(1, record_id);
+  // Head or tail.
+  int choice = std::rand() % 2;
+  if (choice) {
+    record_a->value -= 10;
+    record_b->value += 10;
+  } else {
+    record_a->value += 10;
+    record_b->value -= 10;
+  }
+  record_a->last_updated_trx_id = record_b->last_updated_trx_id = trx->trx_id;
+  return 0;
 }
 
 } // namespace multicore

@@ -30,8 +30,7 @@ int g_table_size;
 int g_num_thread;
 int g_read_num;
 int g_duration;
-record_t* g_table_a;
-record_t* g_table_b;
+record_t* g_table[2];
 // Array of POSIX threads.
 pthread_t* g_threads;
 // Number of READ operations during the test.
@@ -166,17 +165,15 @@ int parse_args(int argc, char* argv[]) {
 }
 
 int table_create(void) {
-  g_table_a = new record_t[g_table_size];
-  g_table_b = new record_t[g_table_size];
-  for (int i = 0; i < g_table_size; ++i) {
-    auto& record_a = g_table_a[i];
-    auto& record_b = g_table_b[i];
-    record_a.id = i + 1;
-    record_a.value = (std::rand() % (100000 - 10000)) + 10000;
-    record_a.last_updated_trx_id = 0;
-    record_b.id = i + 1;
-    record_b.value = (std::rand() % (100000 - 10000)) + 10000;
-    record_b.last_updated_trx_id = 0;
+  for (int i = 0; i < 2; ++i) {
+    record_t*& table = g_table[i];
+    table = new record_t[g_table_size];
+    for (int j = 0; j < g_table_size; ++j) {
+      auto& record = table[j];
+      record.id = j + 1;
+      record.value = (std::rand() % (100000 - 10000)) + 10000;
+      record.last_updated_trx_id = 0;
+    }
   }
   return 0;
 }
@@ -223,8 +220,8 @@ int print_stats(void) {
 }
 
 void table_free(void) {
-  delete g_table_a;
-  delete g_table_b;
+  delete g_table[0];
+  delete g_table[1];
 }
 
 } // namespace multicore

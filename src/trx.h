@@ -100,10 +100,8 @@ extern unsigned long g_n_update;
 extern unsigned long g_n_aborted;
 // Global counter for transaction ID. The first transaction has ID 1.
 extern unsigned long g_counter_trx;
-// Table A.
-extern record_t* g_table_a;
-// Table B.
-extern record_t* g_table_b;
+// Data tables.
+extern record_t* g_table[2];
 // Global lock manager object.
 extern lockmgr_t g_lockmgr;
 

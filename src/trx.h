@@ -123,6 +123,8 @@ void lockmgr_release(lock_t* lock);
 // lock is the last bound of locks to be checked, and trx is current
 // transaction object.
 int lockmgr_detect_deadlock(lock_t* lock, trx_t* trx);
+// Wake up a transaction which was waiting for acquiring given lock.
+void lockmgr_wakeup(lock_t* lock);
 // Frees lock manager.
 void lockmgr_free(void);
 // Initializes a transaction object with given thread index.

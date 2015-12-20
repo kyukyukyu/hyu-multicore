@@ -241,6 +241,13 @@ int lockmgr_detect_deadlock(lock_t* lock, trx_t* trx) {
   return detected ? 1 : 0;
 }
 
+void lockmgr_wakeup(lock_t* lock) {
+  auto* trx = lock->trx;
+  pthread_mutex_lock(&trx->trx_mutex);
+  pthread_cond_signal(&trx->trx_cond);
+  pthread_mutex_unlock(&trx->trx_mutex);
+}
+
 void lockmgr_free(void) {
   auto i = g_lockmgr.n_buckets - 1;
   while (i) {

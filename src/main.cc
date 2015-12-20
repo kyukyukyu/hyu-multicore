@@ -16,6 +16,15 @@ extern "C" {
     (static_cast<double>(count) / static_cast<double>(duration))
 
 namespace multicore {
+  // Main function for this program.
+  int main(int argc, char* argv[]);
+}
+
+int main(int argc, char* argv[]) {
+  return multicore::main(argc, argv);
+}
+
+namespace multicore {
 
 int g_table_size;
 int g_num_thread;

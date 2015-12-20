@@ -184,7 +184,7 @@ void lockmgr_release(lock_t* lock) {
   if (first) {
     // This becomes true if there is any S lock to be waken up by me.
     bool wake_s = false;
-    curr = mine;
+    curr = mine->next;
     if (lock_t::SHARED == mode) {
       while (curr) {
         auto* curr_lock = curr->value;

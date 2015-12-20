@@ -225,6 +225,7 @@ bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
     if (!(table_id == curr_lock->table_id &&
           record_id == curr_lock->record_id)) {
       // Skip locks for other records.
+      curr = curr->next;
       continue;
     }
     trx_t* curr_holder = curr_lock->trx;

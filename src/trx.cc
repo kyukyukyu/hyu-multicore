@@ -118,6 +118,9 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
   new_lock->trx = trx;
   if (conflicts) {
     new_lock->state = lock_t::WAITING;
+    // Mutex for transaction is required to avoid lost-wakeups, and should be
+    // locked before appending new lock to lock list.
+    pthread_mutex_lock(&trx->trx_mutex);
   } else {
     new_lock->state = lock_t::ACQUIRED;
     // Update current transaction's state.
@@ -127,8 +130,6 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
   list_append(new_lock, bucket);
   pthread_mutex_unlock(&g_lockmgr.mutex);
   if (conflicts) {
-    // Mutex for transaction is required to avoid lost-wakeups.
-    pthread_mutex_lock(&trx->trx_mutex);
     // Set current transaction's state.
     trx->wait_lock = new_lock;
     trx->trx_state = trx_t::WAITING;

@@ -116,17 +116,34 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
   new_lock->record_id = record_id;
   new_lock->mode = mode;
   new_lock->trx = trx;
-  new_lock->state = conflicts ? lock_t::WAITING : lock_t::ACQUIRED;
-  list_append(new_lock, bucket);
   if (conflicts) {
+    new_lock->state = lock_t::WAITING;
+  } else {
+    new_lock->state = lock_t::ACQUIRED;
+    // Update current transaction's state.
+    trx->wait_lock = nullptr;
+    trx->trx_state = trx_t::RUNNING;
+  }
+  list_append(new_lock, bucket);
+  pthread_mutex_unlock(&g_lockmgr.mutex);
+  if (conflicts) {
+    // Mutex for transaction is required to avoid lost-wakeups.
     pthread_mutex_lock(&trx->trx_mutex);
+    // Set current transaction's state.
+    trx->wait_lock = new_lock;
+    trx->trx_state = trx_t::WAITING;
     pthread_mutex_unlock(&g_lockmgr.mutex);
     pthread_cond_wait(&trx->trx_cond, &trx->trx_mutex);
+    // Wake up! Since I am updating lock in hash table, acquire lock for the
+    // table.
     pthread_mutex_lock(&g_lockmgr.mutex);
     new_lock->state = lock_t::ACQUIRED;
+    pthread_mutex_unlock(&g_lockmgr.mutex);
+    // Update current transaction's state.
+    trx->wait_lock = nullptr;
+    trx->trx_state = trx_t::RUNNING;
     pthread_mutex_unlock(&trx->trx_mutex);
   }
-  pthread_mutex_unlock(&g_lockmgr.mutex);
   return 0;
 }
 
@@ -239,7 +256,7 @@ bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
     }
     if (trx_t::WAITING == curr_holder->trx_state &&
         !visited[curr_holder->thread_idx]) {
-      if (dfs_for_deadlock(curr_lock, trx, visited)) {
+      if (dfs_for_deadlock(curr_holder->wait_lock, trx, visited)) {
         return true;
       }
     }
@@ -283,7 +300,7 @@ int trx_init(int thread_idx, trx_t* trx) {
   if (pthread_cond_init(&trx->trx_cond, NULL)) {
     return ERRCODE_TO_INT(ERR_TRX_COND_INIT);
   }
-  trx->wait_lock = NULL;
+  trx->wait_lock = nullptr;
   return 0;
 }
 

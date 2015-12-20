@@ -28,6 +28,7 @@ int run_transaction(int thread_idx, trx_t** p_trx) {
       retval = trx_abort(trx);
       goto end_of_trx;
     }
+    sum += val;
   }
   for (unsigned long i = k + g_read_num; i < k + 10; ++i) {
     if (db_update(i, trx)) {

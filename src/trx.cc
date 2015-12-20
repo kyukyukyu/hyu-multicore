@@ -286,6 +286,7 @@ int trx_commit(trx_t* trx) {
 }
 
 int trx_abort(trx_t* trx) {
+  __sync_add_and_fetch(&g_n_aborted, 1);
   return trx_commit(trx);
 }
 
@@ -304,6 +305,7 @@ int db_read(unsigned long table_id, unsigned long record_id, trx_t* trx,
     return 1;
   }
   *p_val = RECORD(table_id, record_id).value;
+  __sync_add_and_fetch(&g_n_read, 1);
   return 0;
 }
 
@@ -325,6 +327,7 @@ int db_update(unsigned long record_id, trx_t* trx) {
     record_b->value -= 10;
   }
   record_a->last_updated_trx_id = record_b->last_updated_trx_id = trx->trx_id;
+  __sync_add_and_fetch(&g_n_update, 1);
   return 0;
 }
 

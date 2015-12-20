@@ -26,6 +26,8 @@ enum errcode_t {
   ERR_INVALID_READ_NUM,
   ERR_INVALID_DURATION,
   ERR_CREATE_TABLES,
+  ERR_TRX_MUTEX_INIT,
+  ERR_TRX_COND_INIT,
   ERR_PRINT_STATS
 };
 
@@ -112,6 +114,8 @@ int run_transaction(int thread_idx, trx_t** p_trx);
 int lockmgr_create(void);
 // Frees lock manager.
 void lockmgr_free(void);
+// Initializes a transaction object with given thread index.
+int trx_init(int thread_idx, trx_t* trx);
 // Frees a transaction object. This releases locks the transaction is holding.
 void trx_free(trx_t* trx);
 

@@ -32,7 +32,26 @@ void lockmgr_free(void) {
   delete g_lockmgr.buckets;
 }
 
+int trx_init(int thread_idx, trx_t* trx) {
+  trx->trx_id = __sync_add_and_fetch(&g_counter_trx, 1);
+  trx->thread_idx = thread_idx;
+  trx->trx_state = trx_t::IDLE;
+  if (pthread_mutex_init(&trx->trx_mutex, NULL)) {
+    return ERRCODE_TO_INT(ERR_TRX_MUTEX_INIT);
+  }
+  if (pthread_cond_init(&trx->trx_cond, NULL)) {
+    return ERRCODE_TO_INT(ERR_TRX_COND_INIT);
+  }
+  trx->wait_lock = NULL;
+  return 0;
+}
+
 void trx_free(trx_t* trx) {
+  for (auto& lock : trx->trx_locks) {
+    delete lock;
+  }
+  pthread_mutex_destroy(&trx->trx_mutex);
+  pthread_cond_destroy(&trx->trx_cond);
 }
 
 } // namespace multicore

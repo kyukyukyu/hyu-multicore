@@ -7,6 +7,8 @@ extern "C" {
 #include <pthread.h>
 }
 
+#include "list.h"
+
 #define ERRCODE_TO_INT(x) (static_cast<int>((x)))
 
 namespace multicore {

@@ -59,6 +59,11 @@ int lockmgr_create(void) {
   return 0;
 }
 
+lockmgr_t::locklist_t* lockmgr_bucket(unsigned long table_id,
+    unsigned long record_id) {
+  return &g_lockmgr.buckets[record_id - 1];
+}
+
 int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
     trx_t* trx, lock_t::mode_t mode) {
   // TODO: lock hash table.

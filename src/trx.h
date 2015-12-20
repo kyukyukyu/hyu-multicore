@@ -110,6 +110,9 @@ extern lockmgr_t g_lockmgr;
 int run_transaction(int thread_idx, trx_t** p_trx);
 // Creates lock manager.
 int lockmgr_create(void);
+// Returns the bucket which points to the lock list for given record.
+lockmgr_t::locklist_t* lockmgr_bucket(unsigned long table_id,
+    unsigned long record_id);
 // Tries to acquire a lock for given record on given transaction. Returns
 // nonzero value if deadlock is detected.
 int lockmgr_acquire(unsigned long table_id, unsigned long record_id,

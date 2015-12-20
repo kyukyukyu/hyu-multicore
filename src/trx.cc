@@ -1,3 +1,5 @@
+#include <cstdlib>
+
 #include "trx.h"
 
 namespace multicore {
@@ -5,6 +7,37 @@ namespace multicore {
 lockmgr_t g_lockmgr;
 
 int run_transaction(int thread_idx, trx_t** p_trx) {
+  trx_t* trx;
+  // BEGIN with creating and initializing transaction object.
+  trx = *p_trx = new trx_t;
+  trx_init(thread_idx, trx);
+  // Pick random number in [1, g_table_size - 9] for the first record index.
+  unsigned long k = 1 + (std::rand() % (g_table_size - 9));
+  // Pick either table A or table B.
+  unsigned long table_id = std::rand() % 2;
+  // Summation of results from READ operations.
+  long sum = 0;
+  for (unsigned long i = k; i < k + g_read_num; ++i) {
+    // Value returned from READ operation.
+    long val;
+    if (db_read(table_id, i, trx, &val)) {
+      // Deadlock detected!!
+      trx_abort(trx);
+      goto end_of_trx;
+    }
+  }
+  for (unsigned long i = k + g_read_num; i < k + 10; ++i) {
+    if (db_update(i, trx)) {
+      // Deadlock detected!!
+      trx_abort(trx);
+      goto end_of_trx;
+    }
+  }
+  trx_commit(trx);
+end_of_trx:
+  // TODO: Move freeing of transaction obj. to inside of deadlock detection.
+  trx_free(*p_trx);
+  delete *p_trx;
   return 0;
 }
 

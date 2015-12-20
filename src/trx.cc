@@ -59,6 +59,146 @@ int lockmgr_create(void) {
   return 0;
 }
 
+int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
+    trx_t* trx, lock_t::mode_t mode) {
+  // TODO: lock hash table.
+  lockmgr_t::locklist_t* bucket = lockmgr_bucket(table_id, record_id);
+  bool conflicts = false;
+  auto* curr = bucket->head;
+  // Check if any conflict exists.
+  if (lock_t::SHARED == mode) {
+    while (curr) {
+      auto* curr_lock = curr->value;
+      if (!(table_id == curr_lock->table_id &&
+            record_id == curr_lock->record_id)) {
+        curr = curr->next;
+        continue;
+      }
+      if (lock_t::EXCLUSIVE == curr_lock->mode) {
+        conflicts = true;
+        break;
+      }
+      curr = curr->next;
+    }
+  } else {  // EXCLUSIVE
+    while (curr) {
+      auto* curr_lock = curr->value;
+      if (table_id == curr_lock->table_id &&
+          record_id == curr_lock->record_id) {
+        conflicts = true;
+        break;
+      }
+      curr = curr->next;
+    }
+  }
+  if (conflicts) {
+    if (detect_deadlock(curr->value, trx)) {
+      return 1;
+    }
+  }
+  auto* new_lock = new lock_t;
+  new_lock->table_id = table_id;
+  new_lock->record_id = record_id;
+  new_lock->mode = mode;
+  new_lock->trx = trx;
+  new_lock->state = conflicts ? lock_t::WAITING : lock_t::ACQUIRED;
+  list_append(new_lock, bucket);
+  if (conflicts) {
+    pthread_mutex_lock(&trx->trx_mutex);
+    // TODO: Unlock hash table.
+    pthread_cond_wait(&trx->trx_cond, &trx->trx_mutex);
+    // TODO: Lock hash table.
+    pthread_mutex_unlock(&trx->trx_mutex);
+  }
+  // TODO: Unlock hash table.
+  return 0;
+}
+
+void lockmgr_release(lock_t* lock) {
+  const auto table_id = lock->table_id;
+  const auto record_id = lock->record_id;
+  const auto mode = lock->mode;
+  // TODO: lock hash table.
+  lockmgr_t::locklist_t* bucket = lockmgr_bucket(table_id, record_id);
+  // True if I am the first one for given table ID and record ID. This should
+  // be checked to decide whether I should wake up blocked transactions by me.
+  bool first = true;
+  auto* curr = bucket->head;
+  // Pointer to node in lock list which has my lock as value.
+  listnode_t<lock_t*>* mine;
+  // Lock blocked by me. If there are more than one blocked lock, none of them
+  // will be assigned to this variable. Instead, they will be waken up one by
+  // one.
+  lock_t* blocked = nullptr;
+  auto* trx = lock->trx;
+  // Find node which has lock object as value.
+  while (curr) {
+    auto* curr_lock = curr->value;
+    if (table_id == curr_lock->table_id && record_id == curr_lock->record_id) {
+      if (trx == curr_lock->trx) {
+        mine = curr;
+        break;
+      }
+      first = false;
+    }
+    curr = curr->next;
+  }
+  // Wake up, if any, the thread who wants to acquire X lock but is blocked by
+  // me.
+  if (first) {
+    // This becomes true if there is any S lock to be waken up by me.
+    bool wake_s = false;
+    curr = mine;
+    if (lock_t::SHARED == mode) {
+      while (curr) {
+        auto* curr_lock = curr->value;
+        if (table_id == curr_lock->table_id &&
+            record_id == curr_lock->record_id) {
+          // There is a lock after me.
+          if (lock_t::EXCLUSIVE == curr_lock->mode) {
+            // The first one is exclusive.
+            blocked = curr_lock;
+          }
+          // I don't care any lock after the first one: rest will be waken up by
+          // other transaction.
+          break;
+        }
+        curr = curr->next;
+      }
+    } else {  // EXCLUSIVE
+      while (curr) {
+        auto* curr_lock = curr->value;
+        if (table_id == curr_lock->table_id &&
+            record_id == curr_lock->record_id) {
+          // There is lock after me.
+          if (lock_t::EXCLUSIVE == curr_lock->mode) {
+            if (!wake_s) {
+              // The first lock after me is X lock: wake this up.
+              blocked = curr_lock;
+            }
+            // I don't care any lock after the first one: rest will be waken up by
+            // other transaction.
+            break;
+          }
+          // The first lock after me is not X lock: wake S locks one by one.
+          wake_s = true;
+          lockmgr_wakeup(curr_lock);
+        }
+        curr = curr->next;
+      }
+    }
+  }
+  list_remove(mine, bucket);
+  delete mine;
+  if (nullptr != blocked) {
+    // There is one blocked lock which should be waken up by me: wake this up.
+    // If there were more than one blocked lock, they have been waken up
+    // already.
+    lockmgr_wakeup(blocked);
+  }
+  // TODO: unlock hash table.
+}
+
 void lockmgr_free(void) {
   auto i = g_lockmgr.n_buckets - 1;
   while (i) {

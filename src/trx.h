@@ -110,6 +110,12 @@ extern lockmgr_t g_lockmgr;
 int run_transaction(int thread_idx, trx_t** p_trx);
 // Creates lock manager.
 int lockmgr_create(void);
+// Tries to acquire a lock for given record on given transaction. Returns
+// nonzero value if deadlock is detected.
+int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
+    trx_t* trx, lock_t::mode_t mode);
+// Release a lock for given record on given transaction.
+void lockmgr_release(lock_t* lock);
 // Frees lock manager.
 void lockmgr_free(void);
 // Initializes a transaction object with given thread index.

@@ -223,7 +223,6 @@ void lockmgr_release(lock_t* lock) {
     }
   }
   list_remove(mine, bucket);
-  delete mine;
   if (nullptr != blocked) {
     // There is one blocked lock which should be waken up by me: wake this up.
     // If there were more than one blocked lock, they have been waken up

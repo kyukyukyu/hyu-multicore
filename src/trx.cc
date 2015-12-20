@@ -140,10 +140,10 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
     // table.
     pthread_mutex_lock(&g_lockmgr.mutex);
     new_lock->state = lock_t::ACQUIRED;
-    pthread_mutex_unlock(&g_lockmgr.mutex);
     // Update current transaction's state.
     trx->wait_lock = nullptr;
     trx->trx_state = trx_t::RUNNING;
+    pthread_mutex_unlock(&g_lockmgr.mutex);
   }
   return 0;
 }

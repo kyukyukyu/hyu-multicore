@@ -191,6 +191,7 @@ void* thread_body(void* t_idx) {
       // the transaction is aborted.
       pthread_exit(NULL);
     }
+    pthread_testcancel();
   }
   pthread_cleanup_pop(0);
   return NULL;

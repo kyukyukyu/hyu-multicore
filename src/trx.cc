@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <cstring>
 
 #include "trx.h"
 
@@ -7,6 +8,8 @@
 namespace multicore {
 
 lockmgr_t g_lockmgr;
+// Visited mark array for DFS in deadlock detection.
+bool* g_dfs_visited;
 
 int run_transaction(int thread_idx, trx_t** p_trx) {
   int retval = 0;
@@ -60,6 +63,7 @@ int lockmgr_create(void) {
   if (pthread_mutex_init(&g_lockmgr.mutex, NULL)) {
     return ERRCODE_TO_INT(ERR_LOCKMGR_MUTEX_INIT);
   }
+  g_dfs_visited = new bool[g_num_thread * g_num_thread];
   return 0;
 }
 
@@ -240,9 +244,9 @@ bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
 }
 
 int lockmgr_detect_deadlock(lock_t* lock, trx_t* trx) {
-  bool* visited = new bool[g_num_thread]();
+  bool* visited = g_dfs_visited + trx->thread_idx * g_num_thread;
+  std::memset(visited, 0, g_num_thread * sizeof(bool));
   bool detected = dfs_for_deadlock(lock, trx, visited);
-  delete[] visited;
   return detected ? 1 : 0;
 }
 
@@ -260,6 +264,7 @@ void lockmgr_free(void) {
     --i;
   }
   delete g_lockmgr.buckets;
+  delete[] g_dfs_visited;
   pthread_mutex_destroy(&g_lockmgr.mutex);
 }
 

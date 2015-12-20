@@ -90,8 +90,8 @@ int main(int argc, char* argv[]) {
   if (retval = print_stats()) {
     return retval;
   }
-  delete g_threads;
-  delete targs;
+  delete[] g_threads;
+  delete[] targs;
   table_free();
   lockmgr_free();
   return 0;
@@ -220,8 +220,8 @@ int print_stats(void) {
 }
 
 void table_free(void) {
-  delete g_table[0];
-  delete g_table[1];
+  delete[] g_table[0];
+  delete[] g_table[1];
 }
 
 } // namespace multicore

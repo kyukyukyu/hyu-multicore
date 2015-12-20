@@ -123,6 +123,7 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
     pthread_mutex_unlock(&g_lockmgr.mutex);
     pthread_cond_wait(&trx->trx_cond, &trx->trx_mutex);
     pthread_mutex_lock(&g_lockmgr.mutex);
+    new_lock->state = lock_t::ACQUIRED;
     pthread_mutex_unlock(&trx->trx_mutex);
   }
   pthread_mutex_unlock(&g_lockmgr.mutex);
@@ -223,8 +224,11 @@ bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
   lock_t* curr_lock;
   while (curr && (curr_lock = curr->value) != lock) {
     if (!(table_id == curr_lock->table_id &&
-          record_id == curr_lock->record_id)) {
-      // Skip locks for other records.
+          record_id == curr_lock->record_id) ||
+        lock_t::WAITING == curr_lock->state) {
+      // Skip locks for other records or in waiting state. A lock in waiting
+      // state is blocked by locks before itself, and deadlock detection on
+      // such locks has been already done.
       curr = curr->next;
       continue;
     }

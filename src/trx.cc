@@ -116,6 +116,7 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
   new_lock->record_id = record_id;
   new_lock->mode = mode;
   new_lock->trx = trx;
+  trx->trx_locks.push_back(new_lock);
   if (conflicts) {
     new_lock->state = lock_t::WAITING;
     // Mutex for transaction is required to avoid lost-wakeups, and should be

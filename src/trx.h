@@ -114,6 +114,12 @@ int lockmgr_create(void);
 void lockmgr_free(void);
 // Initializes a transaction object with given thread index.
 int trx_init(int thread_idx, trx_t* trx);
+// Commits a transaction object. This release locks held by given transaction
+// object, and wakes up other transactions blocked by this.
+int trx_commit(trx_t* trx);
+// Aborts a transaction object. This function is same as commit function for
+// now.
+int trx_abort(trx_t* trx);
 // Frees a transaction object. This releases locks the transaction is holding.
 void trx_free(trx_t* trx);
 

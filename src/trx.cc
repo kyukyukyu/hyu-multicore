@@ -7,6 +7,7 @@ namespace multicore {
 lockmgr_t g_lockmgr;
 
 int run_transaction(int thread_idx, trx_t** p_trx) {
+  int retval = 0;
   trx_t* trx;
   // BEGIN with creating and initializing transaction object.
   trx = *p_trx = new trx_t;
@@ -22,23 +23,23 @@ int run_transaction(int thread_idx, trx_t** p_trx) {
     long val;
     if (db_read(table_id, i, trx, &val)) {
       // Deadlock detected!!
-      trx_abort(trx);
+      retval = trx_abort(trx);
       goto end_of_trx;
     }
   }
   for (unsigned long i = k + g_read_num; i < k + 10; ++i) {
     if (db_update(i, trx)) {
       // Deadlock detected!!
-      trx_abort(trx);
+      retval = trx_abort(trx);
       goto end_of_trx;
     }
   }
-  trx_commit(trx);
+  retval = trx_commit(trx);
 end_of_trx:
   // TODO: Move freeing of transaction obj. to inside of deadlock detection.
   trx_free(*p_trx);
   delete *p_trx;
-  return 0;
+  return retval;
 }
 
 int lockmgr_create(void) {
@@ -77,6 +78,18 @@ int trx_init(int thread_idx, trx_t* trx) {
   }
   trx->wait_lock = NULL;
   return 0;
+}
+
+int trx_commit(trx_t* trx) {
+  for (auto& lock : trx->trx_locks) {
+    lockmgr_release(lock);
+  }
+  trx->trx_state = trx_t::IDLE;
+  return 0;
+}
+
+int trx_abort(trx_t* trx) {
+  return trx_commit(trx);
 }
 
 void trx_free(trx_t* trx) {

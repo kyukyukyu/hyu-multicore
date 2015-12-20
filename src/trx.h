@@ -71,6 +71,14 @@ struct lock_t {
   // Pointer to holder transaction.
   trx_t* trx;
 };
+// Type for lock manager. Internally, this works like hash table.
+struct lockmgr_t {
+  typedef list_t<lock_t*> locklist_t;
+  // List of buckets. Each bucket has lock lists for records mixed.
+  locklist_t* buckets;
+  // Number of buckets.
+  unsigned int n_buckets;
+};
 
 // The number of records in single table.
 extern int g_table_size;
@@ -92,6 +100,8 @@ extern unsigned long g_counter_trx;
 extern record_t* g_table_a;
 // Table B.
 extern record_t* g_table_b;
+// Global lock manager object.
+extern lockmgr_t g_lockmgr;
 
 // Creates a transaction object with given thread index, and runs a transaction
 // for this.

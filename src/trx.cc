@@ -57,6 +57,9 @@ int lockmgr_create(void) {
       return retval;
     }
   }
+  if (pthread_mutex_init(&g_lockmgr.mutex, NULL)) {
+    return ERRCODE_TO_INT(ERR_LOCKMGR_MUTEX_INIT);
+  }
   return 0;
 }
 
@@ -67,7 +70,7 @@ lockmgr_t::locklist_t* lockmgr_bucket(unsigned long table_id,
 
 int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
     trx_t* trx, lock_t::mode_t mode) {
-  // TODO: lock hash table.
+  pthread_mutex_lock(&g_lockmgr.mutex);
   lockmgr_t::locklist_t* bucket = lockmgr_bucket(table_id, record_id);
   bool conflicts = false;
   auto* curr = bucket->head;
@@ -100,6 +103,7 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
   if (conflicts) {
     // curr must be the first conflicting lock with me at this moment.
     if (lockmgr_detect_deadlock(curr->value, trx)) {
+      pthread_mutex_unlock(&g_lockmgr.mutex);
       return 1;
     }
   }
@@ -112,12 +116,12 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
   list_append(new_lock, bucket);
   if (conflicts) {
     pthread_mutex_lock(&trx->trx_mutex);
-    // TODO: Unlock hash table.
+    pthread_mutex_unlock(&g_lockmgr.mutex);
     pthread_cond_wait(&trx->trx_cond, &trx->trx_mutex);
-    // TODO: Lock hash table.
+    pthread_mutex_lock(&g_lockmgr.mutex);
     pthread_mutex_unlock(&trx->trx_mutex);
   }
-  // TODO: Unlock hash table.
+  pthread_mutex_unlock(&g_lockmgr.mutex);
   return 0;
 }
 
@@ -125,7 +129,7 @@ void lockmgr_release(lock_t* lock) {
   const auto table_id = lock->table_id;
   const auto record_id = lock->record_id;
   const auto mode = lock->mode;
-  // TODO: lock hash table.
+  pthread_mutex_lock(&g_lockmgr.mutex);
   lockmgr_t::locklist_t* bucket = lockmgr_bucket(table_id, record_id);
   // True if I am the first one for given table ID and record ID. This should
   // be checked to decide whether I should wake up blocked transactions by me.
@@ -203,7 +207,7 @@ void lockmgr_release(lock_t* lock) {
     // already.
     lockmgr_wakeup(blocked);
   }
-  // TODO: unlock hash table.
+  pthread_mutex_unlock(&g_lockmgr.mutex);
 }
 
 bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
@@ -256,6 +260,7 @@ void lockmgr_free(void) {
     --i;
   }
   delete g_lockmgr.buckets;
+  pthread_mutex_destroy(&g_lockmgr.mutex);
 }
 
 int trx_init(int thread_idx, trx_t* trx) {

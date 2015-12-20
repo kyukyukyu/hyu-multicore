@@ -28,6 +28,7 @@ enum errcode_t {
   ERR_CREATE_TABLES,
   ERR_TRX_MUTEX_INIT,
   ERR_TRX_COND_INIT,
+  ERR_LOCKMGR_MUTEX_INIT,
   ERR_PRINT_STATS
 };
 
@@ -82,6 +83,8 @@ struct lockmgr_t {
   locklist_t* buckets;
   // Number of buckets.
   unsigned int n_buckets;
+  // Mutex for lock hash table.
+  pthread_mutex_t mutex;
 };
 
 // The number of records in single table.

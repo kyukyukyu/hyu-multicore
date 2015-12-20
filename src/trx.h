@@ -119,6 +119,10 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
     trx_t* trx, lock_t::mode_t mode);
 // Release a lock for given record on given transaction.
 void lockmgr_release(lock_t* lock);
+// Checks whether deadlock might occur if a new lock is appended to lock list.
+// lock is the last bound of locks to be checked, and trx is current
+// transaction object.
+int lockmgr_detect_deadlock(lock_t* lock, trx_t* trx);
 // Frees lock manager.
 void lockmgr_free(void);
 // Initializes a transaction object with given thread index.

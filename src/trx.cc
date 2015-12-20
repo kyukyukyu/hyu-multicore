@@ -97,7 +97,8 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
     }
   }
   if (conflicts) {
-    if (detect_deadlock(curr->value, trx)) {
+    // curr must be the first conflicting lock with me at this moment.
+    if (lockmgr_detect_deadlock(curr->value, trx)) {
       return 1;
     }
   }
@@ -202,6 +203,42 @@ void lockmgr_release(lock_t* lock) {
     lockmgr_wakeup(blocked);
   }
   // TODO: unlock hash table.
+}
+
+bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
+  visited[trx->thread_idx] = true;
+  unsigned long table_id = lock->table_id;
+  unsigned long record_id = lock->record_id;
+  auto* bucket = lockmgr_bucket(table_id, record_id);
+  auto* curr = bucket->head;
+  lock_t* curr_lock;
+  while (curr && (curr_lock = curr->value) != lock) {
+    if (!(table_id == curr_lock->table_id &&
+          record_id == curr_lock->record_id)) {
+      // Skip locks for other records.
+      continue;
+    }
+    trx_t* curr_holder = curr_lock->trx;
+    if (trx == curr_holder) {
+      // Deadlock detected!!
+      return true;
+    }
+    if (trx_t::WAITING == curr_holder->trx_state &&
+        !visited[curr_holder->thread_idx]) {
+      if (dfs_for_deadlock(curr_lock, trx, visited)) {
+        return true;
+      }
+    }
+    curr = curr->next;
+  }
+  return false;
+}
+
+int lockmgr_detect_deadlock(lock_t* lock, trx_t* trx) {
+  bool* visited = new bool[g_num_thread]();
+  bool detected = dfs_for_deadlock(lock, trx, visited);
+  delete[] visited;
+  return detected ? 1 : 0;
 }
 
 void lockmgr_free(void) {

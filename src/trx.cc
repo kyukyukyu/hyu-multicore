@@ -241,13 +241,17 @@ bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
   lock_t* curr_lock;
   while (curr && (curr_lock = curr->value) != lock) {
     if (!(table_id == curr_lock->table_id &&
-          record_id == curr_lock->record_id) ||
-        lock_t::WAITING == curr_lock->state) {
-      // Skip locks for other records or in waiting state. A lock in waiting
-      // state is blocked by locks before itself, and deadlock detection on
-      // such locks has been already done.
+          record_id == curr_lock->record_id)) {
+      // Skip locks for other records.
       curr = curr->next;
       continue;
+    }
+    if (lock_t::WAITING == curr_lock->state) {
+      // If a lock in waiting state L is found, this means that any lock after
+      // L is waiting, and no deadlock is detected when they are appended to
+      // this lock list. Therefore, it is OK to stop deadlock detection in this
+      // lock list.
+      break;
     }
     trx_t* curr_holder = curr_lock->trx;
     if (trx == curr_holder) {

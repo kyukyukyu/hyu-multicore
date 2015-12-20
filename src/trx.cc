@@ -117,6 +117,8 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
   new_lock->mode = mode;
   new_lock->trx = trx;
   trx->trx_locks.push_back(new_lock);
+  trx->wait_lock = new_lock;
+  trx->trx_state = trx_t::WAITING;
   if (conflicts) {
     new_lock->state = lock_t::WAITING;
     // Mutex for transaction is required to avoid lost-wakeups, and should be
@@ -132,20 +134,16 @@ int lockmgr_acquire(unsigned long table_id, unsigned long record_id,
   pthread_mutex_unlock(&g_lockmgr.mutex);
   if (conflicts) {
     // Set current transaction's state.
-    pthread_mutex_lock(&g_lockmgr.mutex);
-    trx->wait_lock = new_lock;
-    trx->trx_state = trx_t::WAITING;
-    pthread_mutex_unlock(&g_lockmgr.mutex);
     pthread_cond_wait(&trx->trx_cond, &trx->trx_mutex);
+    pthread_mutex_unlock(&trx->trx_mutex);
     // Wake up! Since I am updating lock in hash table, acquire lock for the
     // table.
     pthread_mutex_lock(&g_lockmgr.mutex);
     new_lock->state = lock_t::ACQUIRED;
+    pthread_mutex_unlock(&g_lockmgr.mutex);
     // Update current transaction's state.
     trx->wait_lock = nullptr;
     trx->trx_state = trx_t::RUNNING;
-    pthread_mutex_unlock(&g_lockmgr.mutex);
-    pthread_mutex_unlock(&trx->trx_mutex);
   }
   return 0;
 }

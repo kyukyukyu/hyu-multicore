@@ -24,6 +24,12 @@ int lockmgr_create(void) {
 }
 
 void lockmgr_free(void) {
+  auto i = g_lockmgr.n_buckets - 1;
+  while (i) {
+    list_free(&g_lockmgr.buckets[i]);
+    --i;
+  }
+  delete g_lockmgr.buckets;
 }
 
 void trx_free(trx_t* trx) {

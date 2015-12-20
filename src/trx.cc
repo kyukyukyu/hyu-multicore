@@ -239,21 +239,24 @@ bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
   auto* bucket = lockmgr_bucket(table_id, record_id);
   auto* curr = bucket->head;
   lock_t* curr_lock;
-  while (curr && (curr_lock = curr->value) != lock) {
+  while (curr) {
+    curr_lock = curr->value;
     if (!(table_id == curr_lock->table_id &&
           record_id == curr_lock->record_id)) {
       // Skip locks for other records.
       curr = curr->next;
       continue;
     }
+    trx_t* curr_holder = curr_lock->trx;
     if (lock_t::WAITING == curr_lock->state) {
       // If a lock in waiting state L is found, this means that any lock after
       // L is waiting, and no deadlock is detected when they are appended to
       // this lock list. Therefore, it is OK to stop deadlock detection in this
-      // lock list.
+      // lock list. Also, L's holder should be marked so that this lock list
+      // is not traversed again.
+      visited[curr_holder->thread_idx] = true;
       break;
     }
-    trx_t* curr_holder = curr_lock->trx;
     if (trx == curr_holder) {
       // Deadlock detected!!
       return true;
@@ -263,6 +266,9 @@ bool dfs_for_deadlock(lock_t* lock, trx_t* trx, bool* visited) {
       if (dfs_for_deadlock(curr_holder->wait_lock, trx, visited)) {
         return true;
       }
+    }
+    if (lock == curr_lock) {
+      break;
     }
     curr = curr->next;
   }
